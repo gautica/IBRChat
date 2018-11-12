@@ -4,19 +4,16 @@
 #include <stdlib.h>
 #include <string.h>
 #include <iostream>
+#include <arpa/inet.h>
 
 void Server::start()
 {
     std::thread listen_to_client(&Server::listen_to_client, this);
 
-    std::thread listen_to_server(&Server::listen_to_server, this);
-
     std::thread connect_server(&Server::connect_server, this);
 
     connect_server.join();
     listen_to_client.join();
-    listen_to_server.join();
-
 }
 
 void Server::listen_to_client()
@@ -29,16 +26,6 @@ void Server::listen_to_client()
     accept_client(socket);
 }
 
-void Server::listen_to_server()
-{
-    memset(&lisToServer.hints, 0, sizeof(lisToServer.hints));
-    lisToServer.hints.ai_family = AF_UNSPEC;
-    lisToServer.hints.ai_socktype = SOCK_STREAM;
-
-    int socket = initalize_server(lisToServer, port_to_server);
-    accept_server(socket);
-}
-
 void Server::connect_server()
 {
     memset(&connServer.hints, 0, sizeof(connServer.hints));
@@ -46,52 +33,37 @@ void Server::connect_server()
     connServer.hints.ai_socktype = SOCK_STREAM;
 
     getaddrinfo(IP, port_server, &connServer.hints, &connServer.addr_info);
-    int client_fd;
-    if ((client_fd = socket(connServer.addr_info->ai_family, connServer.addr_info->ai_socktype, connServer.addr_info->ai_protocol)) == 0) {
+
+    if ((server_fd = socket(connServer.addr_info->ai_family, connServer.addr_info->ai_socktype, connServer.addr_info->ai_protocol)) == 0) {
         perror("socket:");
         exit(EXIT_FAILURE);
     }
     //sockaddr_in serverAddr;
-    if (connect(client_fd, connServer.addr_info->ai_addr, connServer.addr_info->ai_addrlen) == -1) {
+    if (connect(server_fd, connServer.addr_info->ai_addr, connServer.addr_info->ai_addrlen) == -1) {
         perror("connect:");
+        std::cout << "##############################################\n";
+        std::cout << "Attention: Fault only not first started Server\n";
+        std::cout << "##############################################\n";
         //exit(EXIT_FAILURE);
+        server_fd = 0;
         return;
     }
 
     /*************************************************/
     /************** HandShake ************************/
     /*************************************************/
-    handshake_to_server(client_fd);
+    handshake_to_server(server_fd);
 
     // TO DO !!!
-
-}
-
-int Server::initalize_server(addrinfo_t &addr, const char* Port)
-{
-    int server_fd;
-    mutex.lock();
-    getaddrinfo("localhost", Port, &addr.hints, &addr.addr_info);
-
-
-    // Creating socket file descriptor
-    if ((server_fd = socket(addr.addr_info->ai_family, addr.addr_info->ai_socktype, addr.addr_info->ai_protocol)) == 0)
-    {
-        perror("socket failed");
-        exit(EXIT_FAILURE);
+    char buf[BUFFER_SIZE] = {0};
+    while (true) {
+        if (recv(server_fd, buf, BUFFER_SIZE, 0) <= 0) {
+            perror("recv");
+            std::cout << "Failed to recieve update Info from server\n";
+        }
+        update_server_info(server_fd);
+        std::cout << buf << std::endl;
     }
-    if (bind(server_fd, addr.addr_info->ai_addr, addr.addr_info->ai_addrlen)<0)
-    {
-        perror("bind failed");
-        exit(EXIT_FAILURE);
-    }
-    if (listen(server_fd, 3) < 0)
-    {
-        perror("listen");
-        exit(EXIT_FAILURE);
-    }
-    mutex.unlock();
-    return server_fd;
 }
 
 void Server::handle_client(int* socket)
@@ -104,7 +76,42 @@ void Server::handle_client(int* socket)
     handshake_to_client(client_fd);
 
     // TO DO !!!
+    // Listen to clients and also other servers as client
+    char buf[BUFFER_SIZE] = {0};
 
+    while (true) {
+        if (recv(client_fd, buf, BUFFER_SIZE, 0) <= 0) {
+            perror("recv");
+            std::cout << "Failed to recieve update Info from server\n";
+        }
+        update_server_info(client_fd);
+        std::cout << buf << std::endl;
+    }
+
+}
+
+void Server::update_server_info(int &socket)
+{
+    char buf[50] = "I have new server connection";
+    for (auto &it : servers) {
+        if (it.socket != socket) {      // send info to other child servers
+            std::cout << "send info to other servers\n";
+            send(it.socket, buf, strlen(buf), 0);
+        }
+    }
+    // Send info to parent server
+    if (server_fd != 0 && server_fd != socket) {
+        send(server_fd, buf, strlen(buf), 0);
+    }
+}
+
+void Server::update_client_info(int &socket)
+{
+    for (auto &it : servers) {
+        if (it.socket != socket) {
+
+        }
+    }
 }
 
 void Server::handshake_to_client(int &socket)
@@ -124,28 +131,38 @@ void Server::handshake_to_client(int &socket)
         std::cerr <<"Failed to receive messafe from Client\n";
     }
     std::cout << msgC << std::endl;
-}
 
-void Server::handle_server(int* socket)
-{
-    int server_fd = *socket;
-    free(socket);
-    /*************************************************/
-    /************** HandShake ************************/
-    /*************************************************/
-    handshake_to_server(server_fd);
+    int id = atoi(msgC);
+    if (id == 0) {
+        /***** add new server to Vector servers ************/
+        char IP[INET6_ADDRSTRLEN];
+        inet_ntop(client_addr.sin_family, &client_addr.sin_addr, IP, sizeof (IP));
+        server_t server;
+        server.IP = IP;
+        server.socket = socket;
+        server.addr = client_addr;
+        servers.push_back(server);
 
-    // TO DO !!!
+        // information to other connected servers
+        update_server_info(socket);
+
+        std::cout << "Add a new Server with IP: " << IP << "\n";
+    } else if (id == 1) {
+        /********** add new client to Vector clients **************/
+        client_t client;
+        client.addr = client_addr;
+        client.socket = socket;
+        clients.push_back(client);
+        std::cout << "Add a new Client\n";
+    } else {
+        std::cerr << "Error: not identified as SERVER or CLIENT\n";
+    }
 
 }
 
 void Server::handshake_to_server(int &socket)
 {
-    char hostname[200] = {0};
-    hostname[199] = 0;
-    gethostname(hostname, 199);
-    char msgS[500] = "Hello, I am Server: ";
-    strcat(msgS, hostname);
+    char msgS[2] = "0";         // 0 --> ID for server
     if (send(socket, msgS, strlen(msgS), 0) <= 0) {
         std::cerr << "Failed to send message from Server to Server\n";
     }
@@ -156,11 +173,35 @@ void Server::handshake_to_server(int &socket)
     std::cout << msgC << std::endl;
 }
 
+int Server::initalize_server(addrinfo_t &addr, const char* Port)
+{
+    int sock;
+    getaddrinfo(IP, Port, &addr.hints, &addr.addr_info);
+
+
+    // Creating socket file descriptor
+    if ((sock = socket(addr.addr_info->ai_family, addr.addr_info->ai_socktype, addr.addr_info->ai_protocol)) == 0)
+    {
+        perror("socket failed");
+        exit(EXIT_FAILURE);
+    }
+    if (bind(sock, addr.addr_info->ai_addr, addr.addr_info->ai_addrlen)<0)
+    {
+        perror("bind failed");
+        exit(EXIT_FAILURE);
+    }
+    if (listen(sock, 3) < 0)
+    {
+        perror("listen");
+        exit(EXIT_FAILURE);
+    }
+    return sock;
+}
+
 void Server::accept_client(int socket)
 {
     while (true) {
         int* new_client = new int;
-        sockaddr_in client_addr;
         socklen_t addr_len = sizeof(client_addr);
         if ((*new_client = accept(socket, (struct sockaddr*) &client_addr, &addr_len)) < 0) {
             perror("accept");
@@ -169,19 +210,4 @@ void Server::accept_client(int socket)
         vec.push_back(std::thread(&Server::handle_client, this, new_client));
     }
 }
-
-void Server::accept_server(int socket)
-{
-    while (true) {
-        int* new_server = new int;
-        //sockaddr_in server_addr;
-        //socklen_t addr_len = sizeof(server_addr);
-        if ((*new_server = accept(socket, lisToServer.addr_info->ai_addr, &lisToServer.addr_info->ai_addrlen)) < 0) {
-            perror("accept");
-            exit(EXIT_FAILURE);
-        }
-        vec.push_back(std::thread(&Server::handle_server, this, new_server));
-    }
-}
-
 

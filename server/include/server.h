@@ -12,13 +12,16 @@
 #define BUFFER_SIZE 1024
 
 typedef struct {
-    char* IP;
-    char* Port;
-} cleint_t;
+    char* nick_name;
+    int socket;
+    sockaddr_in addr;
+} client_t;
 
 typedef struct {
     char* IP;
-    char* Port;
+    char* port;
+    int socket;
+    sockaddr_in addr;
 } server_t;
 
 typedef struct {
@@ -38,13 +41,11 @@ public:
      */
     Server(const char* IP = "localhost",
            const char* port_to_client = "5000",
-           const char* port_to_server = "6000",
-           const char* port_server = "6000")
-        : port_to_client(port_to_client), port_to_server(port_to_server), port_server(port_server), IP(IP)
+           const char* port_server = "5000")
+        : port_to_client(port_to_client), port_server(port_server), IP(IP)
     {
         std::cout << "IP: " << this->IP << "\n";
         std::cout << "port_to_client: " << this->port_to_client << "\n";
-        std::cout << "port_to_server: " << this->port_to_server << "\n";
         std::cout << "port_server: " << this->port_server << "\n";
     }
 
@@ -52,10 +53,10 @@ public:
 
 private:
     void listen_to_client();
-    void listen_to_server();
     void connect_server();
 
     int initalize_server(addrinfo_t &addr, const char* Port);
+
     /**
      * Handle communication between server and client
      * @brief handle_client
@@ -63,27 +64,32 @@ private:
      */
     void handle_client(int* socket);
     void handshake_to_client(int &socket);
-    /**
-     * Hnadle communication between server and server
-     * @brief handle_server
-     * @param socket
-     */
-    void handle_server(int* socket);
     void handshake_to_server(int &socket);
 
-    void accept_client(int socket);
+    /**
+     * @brief update_server_info: to other server, when new server connection is created
+     */
+    void update_server_info(int &socket);
 
-    void accept_server(int socket);
+    /**
+     * @brief update_client_info: to other server, when new cleint connection is created
+     */
+    void update_client_info(int &socket);
+
+    void accept_client(int socket);
 
 private:
     addrinfo_t lisToClient;
     addrinfo_t lisToServer;
     addrinfo_t connServer;
     const char* port_to_client;
-    const char* port_to_server;
     const char* port_server;
     const char* IP;
-    std::mutex mutex;
     std::vector<std::thread> vec;
+    std::vector<client_t> clients;
+    std::vector<server_t> servers;
+    std::vector<std::pair<server_t, client_t> > routing_table;
+    sockaddr_in client_addr;
+    int server_fd = 0;      // socket for server as client
 };
 #endif
