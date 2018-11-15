@@ -5,6 +5,7 @@
 #include <string.h>
 #include <iostream>
 #include <arpa/inet.h>
+#include "graph.h"
 
 void Server::start()
 {
@@ -22,8 +23,10 @@ void Server::listen_to_client()
     lisToClient.hints.ai_family = AF_UNSPEC;
     lisToClient.hints.ai_socktype = SOCK_STREAM;
 
-    int socket = initalize_server(lisToClient, port_to_client);
-    accept_client(socket);
+    listner_fd = initalize_server(lisToClient, port_to_client);
+    FD_SET(listner_fd, &master);
+    fdmax = listner_fd;
+    accept_client();
 }
 
 void Server::connect_server()
@@ -57,51 +60,28 @@ void Server::connect_server()
     // TO DO !!!
     char buf[BUFFER_SIZE] = {0};
     while (true) {
-        if (recv(server_fd, buf, BUFFER_SIZE, 0) <= 0) {
-            perror("recv");
-            std::cout << "Failed to recieve update Info from server\n";
+        if (recv(server_fd, buf, sizeof(buf), 0) <= 0) {
+            //perror("recv");
+            //std::cout << "Failed to recieve update Info from server\n";
+        } else {
+            handle_recvMsg(server_fd, buf);
+            std::cout << buf << std::endl;
+            memset(buf, 0, sizeof(buf));    // clear buffer
         }
-        update_server_info(server_fd);
-        std::cout << buf << std::endl;
     }
 }
 
-void Server::handle_client(int* socket)
+void Server::update_server_info(int &socket, const char* msg)
 {
-    int client_fd = *socket;
-    free(socket);
-    /*************************************************/
-    /************** HandShake ************************/
-    /*************************************************/
-    handshake_to_client(client_fd);
-
-    // TO DO !!!
-    // Listen to clients and also other servers as client
-    char buf[BUFFER_SIZE] = {0};
-
-    while (true) {
-        if (recv(client_fd, buf, BUFFER_SIZE, 0) <= 0) {
-            perror("recv");
-            std::cout << "Failed to recieve update Info from server\n";
-        }
-        update_server_info(client_fd);
-        std::cout << buf << std::endl;
-    }
-
-}
-
-void Server::update_server_info(int &socket)
-{
-    char buf[50] = "I have new server connection";
     for (auto &it : servers) {
         if (it.socket != socket) {      // send info to other child servers
             std::cout << "send info to other servers\n";
-            send(it.socket, buf, strlen(buf), 0);
+            send(it.socket, msg, strlen(msg), 0);
         }
     }
     // Send info to parent server
     if (server_fd != 0 && server_fd != socket) {
-        send(server_fd, buf, strlen(buf), 0);
+        send(server_fd, msg, strlen(msg), 0);
     }
 }
 
@@ -114,70 +94,71 @@ void Server::update_client_info(int &socket)
     }
 }
 
-void Server::handshake_to_client(int &socket)
+
+void Server::pack_s2s_message(char* msg, Serv_to_Serv &conn)
 {
-    char hostname[200] = {0};
-    hostname[199] = 0;
-    gethostname(hostname, 199);
-    char msgS[500] = "Hello, I am Server: ";
-    strcat(msgS, hostname);
+    strcpy(msg, "sus");
+    strcat(msg, conn.conn);
+    strcat(msg, ";");
+}
 
-    if (send(socket, msgS, 50, 0) <= 0) {
-        std::cerr << "Failed to send message from Server to Client\n";
+void Server::pack_s2s_messages(char* msg)
+{
+    strcpy(msg, "sus");
+    strcat(msg, connections.at(0).conn);
+    for (unsigned int i = 1; i < connections.size(); i++) {
+        strcat(msg, ";");
+        strcat(msg, connections.at(i).conn);
     }
-    std::cout << "Send Handshake out\n" << "\n";
-    char msgC[500] = {0};
-    if (recv(socket, msgC, 500, 0) <= 0) {
-        std::cerr <<"Failed to receive messafe from Client\n";
+}
+
+void Server::unpack_message(char* msg)
+{
+    if (msg[2] == 'c') {    // new server-client connection
+
+    } else if (msg[2] == 's') {     // new server-server connection
+        //msg[0] = msg[1] = msg[2] = ' ';
+        Serv_to_Serv conn;
+        std::cout << "msg: " << msg << "\n";
+        char* token = strtok(msg, ";");
+        printf("token: %s\n", token);
+
+        strcpy(conn.conn, token+3);
+        printf("conn.conn: %s\n", conn.conn);
+        connections.push_back(conn);
+        
+        token = strtok(NULL, ";");
+        while(token != NULL) {
+            std::cout << "unpack_message\n";
+            printf("token: %s\n", token);
+            strcpy(conn.conn, token);
+            connections.push_back(conn);
+            token = strtok(NULL, ";");
+
+        }
     }
-    std::cout << msgC << std::endl;
-
-    int id = atoi(msgC);
-    if (id == 0) {
-        /***** add new server to Vector servers ************/
-        char IP[INET6_ADDRSTRLEN];
-        inet_ntop(client_addr.sin_family, &client_addr.sin_addr, IP, sizeof (IP));
-        server_t server;
-        server.IP = IP;
-        server.socket = socket;
-        server.addr = client_addr;
-        servers.push_back(server);
-
-        // information to other connected servers
-        update_server_info(socket);
-
-        std::cout << "Add a new Server with IP: " << IP << "\n";
-    } else if (id == 1) {
-        /********** add new client to Vector clients **************/
-        client_t client;
-        client.addr = client_addr;
-        client.socket = socket;
-        clients.push_back(client);
-        std::cout << "Add a new Client\n";
-    } else {
-        std::cerr << "Error: not identified as SERVER or CLIENT\n";
-    }
-
 }
 
 void Server::handshake_to_server(int &socket)
 {
-    char msgS[2] = "0";         // 0 --> ID for server
+    char msgS[BUFFER_SIZE] = "sh";       // sh -> from "server" "handshake"
+    strcat(msgS, this->ID);             // Form "sc[ID]"
     if (send(socket, msgS, strlen(msgS), 0) <= 0) {
         std::cerr << "Failed to send message from Server to Server\n";
     }
-    char msgC[500] = {0};
-    if (recv(socket, msgC, 500, 0) <= 0) {
+    char msgC[BUFFER_SIZE] = {0};
+    if (recv(socket, msgC, sizeof (msgC), 0) <= 0) {
         std::cerr <<"Failed to receive message from Server\n";
     }
     std::cout << msgC << std::endl;
+    handle_recvMsg(socket, msgC);
+    
 }
 
 int Server::initalize_server(addrinfo_t &addr, const char* Port)
 {
     int sock;
     getaddrinfo(IP, Port, &addr.hints, &addr.addr_info);
-
 
     // Creating socket file descriptor
     if ((sock = socket(addr.addr_info->ai_family, addr.addr_info->ai_socktype, addr.addr_info->ai_protocol)) == 0)
@@ -198,16 +179,120 @@ int Server::initalize_server(addrinfo_t &addr, const char* Port)
     return sock;
 }
 
-void Server::accept_client(int socket)
+void Server::accept_client()
 {
     while (true) {
-        int* new_client = new int;
-        socklen_t addr_len = sizeof(client_addr);
-        if ((*new_client = accept(socket, (struct sockaddr*) &client_addr, &addr_len)) < 0) {
-            perror("accept");
+        read_fds = master;
+        if (select(fdmax+1, &read_fds, NULL, NULL, NULL) == -1) {
+            perror("select");
             exit(EXIT_FAILURE);
         }
-        vec.push_back(std::thread(&Server::handle_client, this, new_client));
+        // Run through the existing connections looking for data to read
+        for (int i = 0; i <= fdmax; i++) {
+            if (FD_ISSET(i, &read_fds)) {       // Got one active socket
+                if (i == listner_fd) {          // Got new connection
+                   socklen_t addrlen = sizeof(remote_addr);
+                   new_client_fd = accept(listner_fd, (struct sockaddr*) &remote_addr, &addrlen);
+                   if (new_client_fd == -1) {
+                       perror("accept");
+                   } else {
+                       FD_SET(new_client_fd, &master);
+                       if (fdmax < new_client_fd) {
+                           fdmax = new_client_fd;
+                       }
+                       char IP[INET6_ADDRSTRLEN];
+                       printf("selectserver: new connection from %s on socket %d\n",
+                              inet_ntop(remote_addr.ss_family, get_in_addr((struct sockaddr*)&remote_addr), IP, INET6_ADDRSTRLEN),
+                              new_client_fd);
+                   }
+                } else {                        // Got message from one client
+                    int nbyte = 0;
+                    memset(revBuf, 0, sizeof (revBuf));     // clear buffer
+                    if ((nbyte = recv(i, revBuf, BUFFER_SIZE, 0)) <= 0) {
+                        if (nbyte == 0) {       // client has closed connection
+                            printf("selectserver: socket %d hung up\n", i);
+                        } else {
+                            perror("recv");
+                        }
+                        close(i);
+                        FD_CLR(i, &master);
+                    } else {        // get some Data from clients or servers
+                        std::cout << "revBuf: " << revBuf << "\n";
+                        handle_recvMsg(i, revBuf);
+                    }
+                }
+            }
+        }
     }
 }
+
+void Server::handle_recvMsg(int &sock, char* buf)
+{
+    if (buf[0] == 's') {         // message from other server
+        if (buf[1] == 'h') {     // handeshake from server in form of "sh[IP]"
+            server_t new_serv;
+            substring(new_serv.ID, buf, 2, sizeof(new_serv.ID));
+            new_serv.socket = sock;
+            servers.push_back(new_serv);
+            Serv_to_Serv conn;
+            strcpy(conn.conn, this->ID);
+            strcat(conn.conn, "-");
+            strcat(conn.conn, new_serv.ID);
+            connections.push_back(conn);
+
+            // update to other server
+            mutex.lock();
+            memset(this->sendBuf, 0, sizeof(sendBuf));
+            pack_s2s_message(sendBuf, conn);
+            update_server_info(sock, sendBuf);
+
+            // update all info to new server
+            memset(this->sendBuf, 0, sizeof(sendBuf));
+            pack_s2s_messages(sendBuf);
+            send(sock, sendBuf, sizeof(sendBuf), 0);
+            mutex.unlock();
+            //...
+        } else if (buf[1] == 'u') {      // update info from server "su[Update]"
+            mutex.lock();
+            memset(this->sendBuf, 0, sizeof(sendBuf));
+            strcpy(sendBuf, buf);
+            unpack_message(buf);
+
+            // send Update to other connected server
+            update_server_info(sock, sendBuf);
+            mutex.unlock();
+
+            /**
+             *  Test Search Algorithm
+             */
+            printf("connections.size(): %lu\n", connections.size());
+            if (server_fd == 0 && connections.size() >= 2) {
+                Graph graph;
+                graph.create_graph(connections);
+                graph.start_search(this->ID, servers.back().ID);
+                std::cout << graph.get_next_Hup() << "\n";
+            }
+        }
+    } else if (buf[0] == 'c') {  // message from client
+        if (buf[1] == 'h') { // handshake from client in form of "ch[nick_name]"
+
+        }
+    }
+}
+
+void Server::substring(char* dest, char* src, const unsigned int &start, const unsigned int &length)
+{
+    for (unsigned int i = start; i < start + length; i++) {
+        dest[i-start] = src[i];
+    }
+}
+
+void* Server::get_in_addr(struct sockaddr* sa)
+{
+    if (sa->sa_family == AF_INET) {
+            return &(((struct sockaddr_in*)sa)->sin_addr);
+    }
+    return &(((struct sockaddr_in6*)sa)->sin6_addr);
+}
+
 
