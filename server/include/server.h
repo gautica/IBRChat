@@ -55,16 +55,6 @@ typedef struct {
     addrinfo* addr_info;
 } addrinfo_t;
 
-enum Command {
-    JION,
-    LEAVE,
-    NICK,
-    LIST,
-    GETTOPIC,
-    SETTOPIC,
-    PRIVMSG,
-    QUIT
-};
 
 class Server
 {
