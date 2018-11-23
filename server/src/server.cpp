@@ -194,7 +194,7 @@ void Server::unpack_update_info(char* msg)
         strcpy(conn.conn, token+3);
         printf("conn.conn: %s\n", conn.conn);
         s2s_connections.push_back(conn);
-        
+
         token = strtok(NULL, ";");
         while(token != NULL) {
             std::cout << "unpack_update_info\n";
@@ -219,7 +219,7 @@ void Server::handshake_to_server(int &socket)
     }
     std::cout << msgC << std::endl;
     handle_recvMsg(socket, msgC);
-    
+
 }
 
 void Server::handshake_to_client(int &socket)
@@ -307,10 +307,18 @@ void Server::handle_client_handshake(int &sock, char* buf)
     handshake_to_client(sock);
 }
 
+bool Server::is_nick_valid(char *nick)
+{
+    // Search all clients under this servers
+    for (auto &it : clients) {
+        
+    }
+}
+
 void Server::handle_client_update(int &sock, char *buf)
 {
     s2c_t conn;
-    
+
     mutex.lock();
     memset(sendBuf, 0, sizeof(sendBuf));
     strcpy(sendBuf, buf);
@@ -323,7 +331,7 @@ void Server::handle_client_update(int &sock, char *buf)
 
 void Server::handle_client(int &sock, char *buf)
 {
-    if (buf[2] == 'o') {        
+    if (buf[2] == 'o') {
         send_to_one(buf);
     } else if (buf[2] == 'm') {
         send_to_all(sock, buf);
@@ -342,7 +350,7 @@ bool Server::client_match_channel(char *client, char *channel)
 
 int Server::get_fd(char *client_name, char *ch_name)
 {
-    
+
     for (auto &channel : channels) {
         if (strcmp(channel.ID, ch_name) == 0) {
             for (auto &client: channel.clients) {
@@ -385,7 +393,7 @@ void Server::send_to_one(char *buf)
     char name[NICK_SIZE] = {0};
     char cp_buf[sizeof(buf)];
     strcpy(cp_buf, buf);
-    
+
     char *token = strtok(cp_buf, ":");
     strcpy(name, token+3);
 
@@ -415,7 +423,7 @@ void Server::send_to_one(char *buf)
             }
         } else {
             std::cerr << "Client [" << name << "] do not under channel [" << channel << "]" << "\n";
-        }        
+        }
     }
 }
 
@@ -458,7 +466,7 @@ bool Server::join(char* client_name, char *channel)
         if (strcmp(clients.at(i).nick, client_name) == 0) {
             index = i;
             is_success = true;
-        } 
+        }
     }
     // add this client to channel->clients vector
     if (is_success) {
@@ -515,5 +523,3 @@ void* Server::get_in_addr(struct sockaddr* sa)
     }
     return &(((struct sockaddr_in6*)sa)->sin6_addr);
 }
-
-

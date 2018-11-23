@@ -101,7 +101,7 @@ private:
     int initalize_server(addrinfo_t &addr, const char* Port);
 
     void* get_in_addr(struct sockaddr* remote_addr);
-    
+
     void handshake_to_client(int &socket);
     void handle_client_handshake(int &sock, char* buf);
     void handle_client_update(int &sock, char*buf);
@@ -113,12 +113,14 @@ private:
      */
     void handle_client(int &socket, char *buf);
 
+    void is_nick_valid(char *nick);
+
     /**
      * Search matching only by other servers
-     * return true, if client is in channel, otherweise false 
+     * return true, if client is in channel, otherweise false
      */
     bool client_match_channel(char *client, char *channel);
-    
+
     /**
      * @brief get_fd(): return fd, if client_name is under this server and the channel, otherweise -1
      */
