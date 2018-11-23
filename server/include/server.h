@@ -56,7 +56,7 @@ typedef struct {
 } addrinfo_t;
 
 enum Command {
-    JION,
+    JOIN,
     LEAVE,
     NICK,
     LIST,
@@ -113,6 +113,9 @@ private:
      */
     void handle_client(int &socket, char *buf);
 
+    /**
+     * send 0 when username is valid, 1 if not
+     */
     void is_nick_valid(char *nick);
 
     /**

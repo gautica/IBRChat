@@ -4,7 +4,7 @@
 #include <netdb.h>
 #include <stdio.h>
 #include <string.h>
-#include "../include/client.h"
+#include "client.h"
 
 #define MAX_INPUT_LENGTH 256
 
@@ -13,10 +13,12 @@ char username[9]; //max. length is 9
 
 void Client::start_client() {
     while(true) {
+        //TODO: server ch[nickname] senden, also Handshake
         printf("please select a username: ");
         scanf("%s", username);
         if (strlen(username) <= 9 && strlen(username) > 0) {
-            malloc(strlen(username));
+            //send
+            //recv
             break;
         } else {
             printf("[WARNING] username too long/short, please try again [1-9] letters\n");
@@ -45,11 +47,13 @@ void Client::handle_command(char input[]) {
         exit(EXIT_SUCCESS);
     } else if (strcmp("/leave", input) == 0) {
         //TODO: leave current channel and send this action to the server
-    } else if (strcmp("list", input) == 0) {
+    } else if (strcmp("/list", input) == 0) {
         //TODO: send message to server to get all channels and recv answer and print answer
     } else if (strcmp("/help", input) == 0) {
         list_commands();
     }
+    //sende cb[COMMAND]
+    //nutze strtok
     //join <name>
     //nick <name>
     //get topic <channel>
@@ -70,7 +74,6 @@ void Client::connect_to_server(const char* IP, const char* port) {
         perror("[WARNING] could not connect to the server");
         //exit(EXIT_FAILURE);
     }
-    //TODO: Handshake
 }
 
 void Client::send_message(char message[]) {
@@ -79,6 +82,7 @@ void Client::send_message(char message[]) {
     }
 }
 
+//auf neuen Thread
 void Client::recv_message() {
 
 }
