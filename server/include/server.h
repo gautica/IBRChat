@@ -11,28 +11,60 @@
 #include <string.h>
 
 #define BUFFER_SIZE 1024
+#define NICK_SIZE 50
+#define CHANNEL_SIZE 50
+#define CHANNEL_THEMA_SIZE 500
 
 typedef struct {
-    char nick_name[50] = {0};
+    char nick[NICK_SIZE] = {0};
     int socket;
-    //sockaddr_in addr;
+    bool operator==(client_t &client) {
+        return strcmp(this->nick, client.nick) == 0;
+    }
 } client_t;
 
 typedef struct {
     char ID[INET6_ADDRSTRLEN+7] = {0};      // ID = IP:Port
-    //char* port;
     int socket;
-    //sockaddr_in addr;
+    bool operator==(server_t &server) {
+        return strcmp(this->ID, server.ID) == 0;
+    }
 } server_t;
 
 typedef struct {
+    char ID[CHANNEL_SIZE] = {0};
+    char creator[NICK_SIZE] = {0};
+    char thema[CHANNEL_THEMA_SIZE] = {0};
+    std::vector<client_t> clients;
+} channel_t;
+
+typedef struct {
     char conn[3*INET6_ADDRSTRLEN] = {0};
-} Serv_to_Serv;
+} s2s_t;
+
+typedef struct {
+    char conn[INET6_ADDRSTRLEN + NICK_SIZE + 2] = {0};
+} s2c_t;
+
+typedef struct {
+    char conn[CHANNEL_SIZE+NICK_SIZE+2] = {0};
+} ch2c_t;
 
 typedef struct {
     struct addrinfo hints;
     addrinfo* addr_info;
 } addrinfo_t;
+
+enum Command {
+    JION,
+    LEAVE,
+    NICK,
+    LIST,
+    GETTOPIC,
+    SETTOPIC,
+    PRIVMSG,
+    QUIT
+};
 
 class Server
 {
@@ -69,35 +101,85 @@ private:
     int initalize_server(addrinfo_t &addr, const char* Port);
 
     void* get_in_addr(struct sockaddr* remote_addr);
+    
+    void handshake_to_client(int &socket);
+    void handle_client_handshake(int &sock, char* buf);
+    void handle_client_update(int &sock, char*buf);
+
     /**
-     * Handle communication between server and client
+     * Handle client chat message
      * @brief handle_client
      * @param socket
      */
-    void handle_client(int* socket);
-    void handshake_to_client(int &socket);
+    void handle_client(int &socket, char *buf);
+
+    /**
+     * Search matching only by other servers
+     * return true, if client is in channel, otherweise false 
+     */
+    bool client_match_channel(char *client, char *channel);
+    
+    /**
+     * @brief get_fd(): return fd, if client_name is under this server and the channel, otherweise -1
+     */
+    int get_fd(char *client_name, char* channel);
+
+    /**
+     * @brief get_server(char *client_name, char *server): get server ID, if client is under other server
+     * return true, if server is found and saved in server
+     * return false, if nicht found
+     */
+    bool get_server(char *client_name, char *server);
+
+    /**
+     * return fd of next connected server, which has a path from server to dest_server
+     * return -1, otherweise
+     */
+    int get_next_hop(char *dest_server);
+
+
     void handshake_to_server(int &socket);
+    void handle_server_handshake(int &sock, char *buf);
+    void handle_server_update(int &sock, char *buf);
 
     /**
-     * @brief update_server_info: to other server, when new server connection is created
+     * @brief update_info: to other server, if there are infos to update
      */
-    void update_server_info(int &socket, const char* msg);
+    void update_info(int &socket, const char* msg);
 
-    void pack_s2s_message(char* msg, Serv_to_Serv &conn);
+    void pack_s2s_message(char* msg, s2s_t &conn);
     void pack_s2s_messages(char* msg);
-    void pack_s2c_message();
-    void pack_s2c_messages();
-    void unpack_message(char* msg);
-    /**
-     * @brief update_client_info: to other server, when new cleint connection is created
-     */
-    void update_client_info(int &socket);
+    void pack_s2c_message(char *msg, s2c_t &conn);
 
-    void accept_client();
+    /**
+     * @brief unpack_message: unpack update_info between servers
+     */
+    void unpack_update_info(char* msg);
+
+    void accept_connection();
 
     void handle_recvMsg(int &sock, char* buf);
 
+    void send_to_one(char *buf);
+
+    void send_to_all(int &sock, char *buf);
+
     void substring(char* dest, char* src, const unsigned int &start, const unsigned int &length);
+
+    /***************************************************/
+    /************ Handle Command ***********************/
+    /***************************************************/
+    /**
+     * @brief join(): can failed, if cleint is already in a channel
+     */
+    bool join(char* client_name, char* channel);
+    bool leave(char* client_name, char* channel);
+    bool change_nick(client_t &client, char* nick);
+    void list_channels(char* buf);
+    void get_topic(char *topic);
+    bool set_topic(char *topic);
+    bool private_Msg(char *nick);
+    void quit();
 
 private:
     addrinfo_t lisToClient;
@@ -107,17 +189,17 @@ private:
     const char* port_server;
     const char* IP;
     char ID[INET6_ADDRSTRLEN+7];        // ID = IP:Port
-    std::vector<std::thread> vec;
     std::vector<client_t> clients;
     std::vector<server_t> servers;
-    std::vector<std::pair<server_t, client_t> > routing_table;
-    sockaddr_in client_addr;
-    int server_fd = 0;      // socket for server as client
-    std::vector<Serv_to_Serv> connections;
+    std::vector<channel_t> channels;
+    std::vector<s2s_t> s2s_connections;
+    std::vector<s2c_t> s2c_connections;
+    std::vector<ch2c_t> ch2c_connections;
 
     fd_set master, read_fds;
     struct sockaddr_storage remote_addr;
     int new_client_fd;
+    int server_fd = 0;
     int listner_fd;
     int fdmax;
     char revBuf[BUFFER_SIZE] = {0};

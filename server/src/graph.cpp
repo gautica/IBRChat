@@ -1,6 +1,6 @@
 #include "graph.h"
 
-void Graph::create_graph(std::vector<Serv_to_Serv> &connections)
+void Graph::create_graph(std::vector<s2s_t> &connections)
 {
     std::cout << "Creating graph...\n";
     for (unsigned int i = 0; i < connections.size(); i++) {
@@ -12,7 +12,7 @@ void Graph::create_graph(std::vector<Serv_to_Serv> &connections)
     }
 }
 
-void Graph::create_node(Serv_to_Serv &conn)
+void Graph::create_node(s2s_t &conn)
 {
     
     Node node_1, node_2;
@@ -89,8 +89,8 @@ void Graph::depth_search(Node &start, Node &dest)
     std::cout << "Have found a path...\n";
 }
 
-char* Graph::get_next_Hup() {
-    return path.back().ID;
+char* Graph::get_next_Hop() {
+    return path.at(1).ID;
 }
 
 bool Graph::have_neighbor(Node &node)

@@ -21,16 +21,16 @@ class Graph
 public:
     Graph() {};
 
-    void create_graph(std::vector<Serv_to_Serv> &connections);
+    void create_graph(std::vector<s2s_t> &connections);
 
     void start_search(char* start, char* dest);
 
     void get_path();
 
-    char* get_next_Hup();
+    char* get_next_Hop();
 
 private:
-    void create_node(Serv_to_Serv &conn);
+    void create_node(s2s_t &conn);
 
     int isContained(Node &node, std::vector<Node> &nodes);
 
