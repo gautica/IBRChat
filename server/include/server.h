@@ -18,17 +18,11 @@
 typedef struct {
     char nick[NICK_SIZE] = {0};
     int socket;
-    bool operator==(client_t &client) {
-        return strcmp(this->nick, client.nick) == 0;
-    }
 } client_t;
 
 typedef struct {
     char ID[INET6_ADDRSTRLEN+7] = {0};      // ID = IP:Port
     int socket;
-    bool operator==(server_t &server) {
-        return strcmp(this->ID, server.ID) == 0;
-    }
 } server_t;
 
 typedef struct {
@@ -105,7 +99,7 @@ private:
     /**
      * send 0 when username is valid, 1 if not
      */
-    void is_nick_valid(char *nick);
+    bool is_nick_valid(char *nick);
 
     /**
      * Search matching only by other servers
@@ -144,6 +138,7 @@ private:
     void pack_s2s_message(char* msg, s2s_t &conn);
     void pack_s2s_messages(char* msg);
     void pack_s2c_message(char *msg, s2c_t &conn);
+    void pack_ch2c_message(char* msg, ch2c_t &conn);
 
     /**
      * @brief unpack_message: unpack update_info between servers
@@ -166,8 +161,8 @@ private:
     /**
      * @brief join(): can failed, if cleint is already in a channel
      */
-    bool join(char* client_name, char* channel);
-    bool leave(char* client_name, char* channel);
+    bool join(int &sock, char* channel);
+    bool leave(int &sock, char* channel);
     bool change_nick(client_t &client, char* nick);
     void list_channels(char* buf);
     void get_topic(char *topic);
@@ -183,6 +178,7 @@ private:
     const char* port_server;
     const char* IP;
     char ID[INET6_ADDRSTRLEN+7];        // ID = IP:Port
+    char parentID[INET6_ADDRSTRLEN+7];
     std::vector<client_t> clients;
     std::vector<server_t> servers;
     std::vector<channel_t> channels;
@@ -198,6 +194,7 @@ private:
     int fdmax;
     char revBuf[BUFFER_SIZE] = {0};
     char sendBuf[BUFFER_SIZE] = {0};
+
     std::mutex mutex;
 };
 #endif
