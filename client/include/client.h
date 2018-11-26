@@ -17,6 +17,10 @@ public:
      * @param port: port from the server the client should connect to
      */
     void connect_to_server(const char* IP, const char* port);
+    /**
+     * @brief waits for messages from the server
+     */
+    void recv_messages();
 
 private:
     /**
@@ -28,10 +32,6 @@ private:
      * @param the message the client should send
      */
     void send_message(char message[]);
-    /**
-     * @brief recv_message
-     */
-    void recv_message();
     /**
      * @brief lists all commands
      */

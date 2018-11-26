@@ -13,13 +13,27 @@ char username[9]; //max. length is 9
 
 void Client::start_client() {
     while(true) {
-        //TODO: server ch[nickname] senden, also Handshake
         printf("please select a username: ");
         scanf("%s", username);
         if (strlen(username) <= 9 && strlen(username) > 0) {
-            //send
-            //recv
-            break;
+
+            //-------------------------------------------------
+            break; //delete this when server connection works
+            //-------------------------------------------------
+
+            //send ch[username], so server can check if avaiable
+            send_message(username);
+            //recv if name was available
+            char confirm[MAX_INPUT_LENGTH];
+            if (recv(soc, confirm, MAX_INPUT_LENGTH-1, 0)!= -1) {
+                if (confirm[0] == '1') {
+                    break;
+                } else {
+                    printf("[WARNING] this username is already taken, please try again\n");
+                }
+            } else {
+                printf("[WARNING] could not handshake with the server\n");
+            }
         } else {
             printf("[WARNING] username too long/short, please try again [1-9] letters\n");
         }
@@ -29,36 +43,41 @@ void Client::start_client() {
 
 void Client::handle_input() {
     while (true) {
+        //printf("%s: ", username);
         char input[MAX_INPUT_LENGTH];
-        scanf("%s", input);
+        fgets(input, MAX_INPUT_LENGTH, stdin);
         //checks if command was used
         if (input[0] == '/') {
             handle_command(input);
         } else {
             //if no command was used, sends message to the channel
-            // send_message() ....
+            //send_message(); //ccm
         }
     }
 }
 
 void Client::handle_command(char input[]) {
-    if (strcmp("/quit", input) == 0) {
+    //sende cb[COMMAND]
+    if (strncmp("/quit", input, strlen("/quit")) == 0) {
         printf("see you soon\n");
         exit(EXIT_SUCCESS);
-    } else if (strcmp("/leave", input) == 0) {
-        //TODO: leave current channel and send this action to the server
-    } else if (strcmp("/list", input) == 0) {
-        //TODO: send message to server to get all channels and recv answer and print answer
-    } else if (strcmp("/help", input) == 0) {
+    } else if (strncmp("/leave", input, strlen("/leave")) == 0) {
+        //send message
+    } else if (strncmp("/list", input, strlen("/list")) == 0) {
+        //send message
+    } else if (strncmp("/help", input, strlen("/help")) == 0) {
         list_commands();
+    } else if (strncmp("/nick ", input, strlen("/nick ")) == 0) {
+        //username = ..........
+    } else if (strncmp("/join ", input, strlen("/join ")) == 0) {
+        //send msg
+    } else if (strncmp("/gettopic ", input, strlen("/gettopic ")) == 0) {
+        //send msg
+    } else if (strncmp("/settopic ", input, strlen("/settopic ")) == 0) {
+        //send msg
+    } else if (strncmp("/privmsg ", input, strlen("/privmsg ")) == 0) {
+        //send msg
     }
-    //sende cb[COMMAND]
-    //nutze strtok
-    //join <name>
-    //nick <name>
-    //get topic <channel>
-    //set topic <channel>
-    //privmsg <name> <message>
 }
 
 void Client::connect_to_server(const char* IP, const char* port) {
@@ -78,13 +97,18 @@ void Client::connect_to_server(const char* IP, const char* port) {
 
 void Client::send_message(char message[]) {
     if (send(soc, message, strlen(message), 0) == -1) {
-        perror("[WARNING] an error occured while sending the message, please try again\n");
+        perror("[WARNING] an error occured while sending the message, please try again");
     }
 }
 
-//auf neuen Thread
-void Client::recv_message() {
-
+void Client::recv_messages() {
+    while (true) {
+        char recvMsg[MAX_INPUT_LENGTH];
+        if (recv(soc, recvMsg, MAX_INPUT_LENGTH-1, 0) == -1) {
+            perror("[WARNING] an error occured while reciving a message");
+        }
+        printf("%s\n", recvMsg);
+    }
 }
 
 void Client::list_commands() {
@@ -100,9 +124,4 @@ void Client::list_commands() {
     printf("/quit - stops the IBRC and leaves the current channel\n");
     printf ("-----------------------------------------------------------------------\n");
 }
-
-
-
-
-
 
