@@ -318,6 +318,10 @@ void Server::handle_client_handshake(int &sock, char* buf)
     client_t new_client;
     new_client.socket = sock;
     strcpy(new_client.nick, buf+2);
+    if (!is_nick_valid(new_client.nick)) {
+        handle_errors(sock, UNVALID_NICK);
+        return;
+    }
     clients.push_back(new_client);
     std::cout << "new client " << new_client.nick << " has connected\n";
     std::cout << "server has " << clients.size() << " clients\n";
@@ -341,8 +345,23 @@ bool Server::is_nick_valid(char *nick)
 {
     // Search all clients under this servers
     for (auto &it : clients) {
-
+        if (strcmp(it.nick, nick) == 0) {
+            return false;
+        }
     }
+    for (auto &ch : channels) {
+        for (auto &client : ch.clients) {
+            if (strcmp(client.nick, nick) == 0) {
+                return false;
+            }
+        }
+    }
+    for (auto &it : s2c_connections) {
+        if (strstr(it.conn, nick) != NULL) {
+            return false;
+        }
+    }
+    return true;
 }
 
 void Server::handle_client_update(int &sock, char *buf)
@@ -363,7 +382,7 @@ void Server::handle_client(int &sock, char *buf)
 {
     if (buf[2] == 'o') {
         std::cout << "one to one\n";
-        send_to_one(buf);
+        send_to_one(sock, buf);
     } else if (buf[2] == 'm') {
         std::cout << "one to many" << '\n';
         send_to_all(sock, buf);
@@ -409,14 +428,6 @@ bool Server::get_server(char *client_name, char *server)
 
 int Server::get_next_hop(char *server)
 {
-/**
-    Graph graph;
-    graph.create_graph(s2s_connections);
-    std::cout << "dest_server: " << dest_server << "\n";
-    graph.start_search(this->ID, dest_server);
-    char* server = graph.get_next_Hop();
-    std::cout << "next_hop: " << server << "\n";
-*/
     for (auto &it : servers) {
         if (strcmp(server, it.ID) == 0) {
             return it.socket;
@@ -426,7 +437,7 @@ int Server::get_next_hop(char *server)
     return server_fd;
 }
 
-void Server::send_to_one(char *buf)
+void Server::send_to_one(int &sock, char *buf)
 {
     char name[NICK_SIZE] = {0};
     char cp_buf[strlen(buf)+1] = {0};
@@ -461,6 +472,7 @@ void Server::send_to_one(char *buf)
             }
         } else {
             std::cerr << "Client [" << name << "] do not under channel [" << channel << "]" << "\n";
+            handle_errors(sock, UNVALID_CLIENT);
         }
     }
 }
@@ -498,6 +510,24 @@ void Server::send_to_all(int &sock, char *buf)
             }
             return;
         }
+    }
+}
+
+void Server::handle_errors(int &sock, int ERROR)
+{
+    char err_buf[100] = {0};
+    switch (ERROR) {
+        case UNVALID_NICK:
+            strcpy(err_buf, "Your name is already reserved, Please change another name\n");
+            break;
+        case UNVALID_CLIENT:
+            strcpy(err_buf, "This Client is not found under the channel, Please check if the client and channel are valid\n");
+            break;
+        default:
+            break;
+    }
+    if (send(sock, err_buf, strlen(err_buf), 0) <= 0) {
+        std::cerr << "Failed to handle error to client\n";
     }
 }
 

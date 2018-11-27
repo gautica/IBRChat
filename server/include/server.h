@@ -49,6 +49,11 @@ typedef struct {
     addrinfo* addr_info;
 } addrinfo_t;
 
+enum ERROR {
+    UNVALID_NICK,
+    UNVALID_CLIENT
+};
+
 class Server
 {
 public:
@@ -149,9 +154,11 @@ private:
 
     void handle_recvMsg(int &sock, char* buf);
 
-    void send_to_one(char *buf);
+    void send_to_one(int &sock, char *buf);
 
     void send_to_all(int &sock, char *buf);
+
+    void handle_errors(int &sock, int ERROR);
 
     void substring(char* dest, char* src, const unsigned int &start, const unsigned int &length);
 
