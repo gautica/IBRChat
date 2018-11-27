@@ -5,31 +5,33 @@
 #include <stdio.h>
 #include <string.h>
 #include "client.h"
+#include "../../io/include/IBRSocket.h"
 
 #define MAX_INPUT_LENGTH 256
+#define CLIENT_HANDSHAKE "ch"
 
+const char divider[] = ":";
 int soc;
 char username[9]; //max. length is 9
+char channelname[12]; //max. length is 12
 
 void Client::start_client() {
     while(true) {
         printf("please select a username: ");
         scanf("%s", username);
         if (strlen(username) <= 9 && strlen(username) > 0) {
-
-            //-------------------------------------------------
-            break; //delete this when server connection works
-            //-------------------------------------------------
-
+            char handshake[11] = CLIENT_HANDSHAKE;
+            strcat(handshake, username);
             //send ch[username], so server can check if avaiable
-            send_message(username);
+            send_message(handshake);
             //recv if name was available
             char confirm[MAX_INPUT_LENGTH];
             if (recv(soc, confirm, MAX_INPUT_LENGTH-1, 0)!= -1) {
-                if (confirm[0] == '1') {
+                printf("CONFIRM: %s\n", confirm);
+                if (confirm[0] == 'H') { //Hello, I'm the server with IP: [IP]:[PORT]
                     break;
                 } else {
-                    printf("[WARNING] this username is already taken, please try again\n");
+                    printf("[SERVER]: %s\n", confirm);
                 }
             } else {
                 printf("[WARNING] could not handshake with the server\n");
@@ -51,32 +53,46 @@ void Client::handle_input() {
             handle_command(input);
         } else {
             //if no command was used, sends message to the channel
-            //send_message(); //ccm
+            //send ccm[channel]:[message] to server
+            char message[MAX_INPUT_LENGTH + strlen(channelname)+ strlen("ccm") + strlen(divider)] = "ccm";
+            strcat(message, channelname);
+            strcat(message, divider);
+            strcat(message, input);
+            send_message(message);
         }
     }
 }
 
 void Client::handle_command(char input[]) {
-    //sende cb[COMMAND]
-    if (strncmp("/quit", input, strlen("/quit")) == 0) {
+    //send cb[cmd] to server if needed
+    char temp[MAX_INPUT_LENGTH];
+    if (strncmp(QUIT_CMD, input, strlen(QUIT_CMD)) == 0) {
         printf("see you soon\n");
         exit(EXIT_SUCCESS);
-    } else if (strncmp("/leave", input, strlen("/leave")) == 0) {
-        //send message
-    } else if (strncmp("/list", input, strlen("/list")) == 0) {
-        //send message
-    } else if (strncmp("/help", input, strlen("/help")) == 0) {
+    } else if (strncmp(LEAVE_CMD, input, strlen(LEAVE_CMD)) == 0) {
+        send_command(LEAVE);
+    } else if (strncmp(HELP_CMD, input, strlen(HELP_CMD)) == 0) {
         list_commands();
-    } else if (strncmp("/nick ", input, strlen("/nick ")) == 0) {
-        //username = ..........
-    } else if (strncmp("/join ", input, strlen("/join ")) == 0) {
-        //send msg
-    } else if (strncmp("/gettopic ", input, strlen("/gettopic ")) == 0) {
-        //send msg
-    } else if (strncmp("/settopic ", input, strlen("/settopic ")) == 0) {
-        //send msg
-    } else if (strncmp("/privmsg ", input, strlen("/privmsg ")) == 0) {
-        //send msg
+    } else if (strncmp(JOIN_CMD, input, strlen(JOIN_CMD)) == 0) {
+        send_command(JOIN);
+        strcpy(temp, input + strlen(JOIN_CMD));
+        send_message(temp);
+    } else if (strncmp(NICK_CMD, input, strlen(NICK_CMD)) == 0) {
+        send_command(NICK);
+        strcpy(temp, input + strlen(NICK_CMD));
+        send_message(temp);
+    } else if (strncmp(LIST_CMD, input, strlen(LIST_CMD)) == 0) {
+        send_command(LIST);
+    } else if (strncmp(GTOPIC_CMD, input, strlen(GTOPIC_CMD)) == 0) {
+        send_command(GETTOPIC);
+        strcpy(temp, input + strlen(GTOPIC_CMD));
+        send_message(temp);
+    } else if (strncmp(STOPIC_CMD, input, strlen(STOPIC_CMD)) == 0) {
+        send_command(SETTOPIC);
+        strcpy(temp, input + strlen(STOPIC_CMD));
+        send_message(temp);
+    } else if (strncmp(PRIVMSG_CMD, input, strlen(PRIVMSG_CMD)) == 0) {
+        // send privmsg, target:channel:name
     }
 }
 
@@ -91,12 +107,18 @@ void Client::connect_to_server(const char* IP, const char* port) {
     soc = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
     if (connect(soc, res->ai_addr, res->ai_addrlen) == -1) {
         perror("[WARNING] could not connect to the server");
-        //exit(EXIT_FAILURE);
+        exit(EXIT_FAILURE);
+    }
+}
+
+void Client::send_command(short cmd) {
+    if (send(soc, &cmd, 2, 0) == -1) {
+        perror("[WARNING] an error occured while sending the command, please try again");
     }
 }
 
 void Client::send_message(char message[]) {
-    if (send(soc, message, strlen(message), 0) == -1) {
+    if (send(soc, message, strlen(message) + 1, 0) == -1) {
         perror("[WARNING] an error occured while sending the message, please try again");
     }
 }

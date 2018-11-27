@@ -1,6 +1,17 @@
 #define CLIENT_H
 
 class Client
+
+#define QUIT_CMD "/quit"
+#define LEAVE_CMD "/leave"
+#define HELP_CMD "/help"
+#define JOIN_CMD "/join "
+#define NICK_CMD "/nick "
+#define LIST_CMD "/list"
+#define GTOPIC_CMD "/gettopic "
+#define STOPIC_CMD "/settopic "
+#define PRIVMSG_CMD "/privmsg "
+
 {
 public:
     /**
@@ -36,5 +47,10 @@ private:
      * @brief lists all commands
      */
     void list_commands();
+    /**
+     * @brief sends command to a server
+     */
+    void send_command(short cmd);
 
 };
+
