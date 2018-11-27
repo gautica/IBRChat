@@ -1,10 +1,27 @@
 enum Command{
-    JOIN,
-    LEAVE,
-    NICK,
-    LIST,
-    GETTOPIC,
-    SETTOPIC,
-    PRIVMSG,
-    QUIT
+	JOIN,
+	LEAVE,
+	NICK,
+	LIST,
+	GETTOPIC,
+	SETTOPIC,
+	MSG,
+	PRIVMSG,
+	QUIT
+};
+
+enum ServerCommand{
+	SC_CLIENT_NEW,
+	SC_CLIENT_REMOVE,
+	SC_SERVER_NEW,
+	SC_CHANNEL_NEW,
+	SC_CHANNEL_NAME,
+	SC_CLIENT_NAME,
+	SC_MSG,
+	SC_PRIVMSG
+};
+
+enum InitCommand{
+	IC_SERVER,
+	IC_CLIENT
 };
