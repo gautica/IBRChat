@@ -8,7 +8,6 @@
 #include "../../io/include/IBRSocket.h"
 
 #define MAX_INPUT_LENGTH 256
-#define CLIENT_HANDSHAKE "ch"
 
 const char divider[] = ":";
 int soc;
@@ -20,8 +19,9 @@ void Client::start_client() {
         printf("please select a username: ");
         scanf("%s", username);
         if (strlen(username) <= 9 && strlen(username) > 0) {
-            char handshake[11] = CLIENT_HANDSHAKE;
-            strcat(handshake, username);
+            char handshake[11];
+            pack_cmd(IC_CLIENT, handshake);
+            strcat(handshake + 2, username);
             //send ch[username], so server can check if avaiable
             send_message(handshake);
             //recv if name was available
@@ -145,5 +145,12 @@ void Client::list_commands() {
     printf("/privmsg <name> <message> - sends private <message> to the user <name>\n");
     printf("/quit - stops the IBRC and leaves the current channel\n");
     printf ("-----------------------------------------------------------------------\n");
+}
+
+void Client::pack_cmd(unsigned int cmd, char* buf) {
+    int temp = cmd;
+    unsigned char *ptr = (unsigned char*) &temp;
+    buf[0] = ptr[0];
+    buf[1] = ptr[1];
 }
 
