@@ -14,7 +14,6 @@ const char divider[] = ":";
 int soc;
 char username[9]; //max. length is 9
 char channelname[12]; //max. length is 12
-
 void Client::start_client() {
     while(true) {
         printf("please select a username: ");
@@ -49,10 +48,11 @@ void Client::handle_input() {
         printf("[%s][@%s]: ", username, channelname);
         char input[MAX_INPUT_LENGTH];
         fgets(input, MAX_INPUT_LENGTH, stdin);
+        input[strcspn(input, "\n")] = 0;
         //checks if command was used
         if (input[0] == '/') {
             handle_command(input);
-        } else {
+        } else if (strlen(input) > 0) {
             //if no command was used, sends message to the channel
             //send MSG[channel]:[message] to server
             char message[MAX_INPUT_LENGTH + strlen(channelname) + strlen(divider) + CMD_SIZE] = {0};
@@ -82,6 +82,7 @@ void Client::handle_command(char input[]) {
         pack_cmd(JOIN, temp);
         strcpy(temp + CMD_SIZE, input + strlen(JOIN_CMD));
         send_message(temp);
+        printf("temp: %s\n", temp+CMD_SIZE);
         strcpy(channelname, temp+CMD_SIZE);
     } else if (strncmp(NICK_CMD, input, strlen(NICK_CMD)) == 0) {
         send_command(NICK);
