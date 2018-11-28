@@ -8,6 +8,7 @@
 #include "../../io/include/IBRSocket.h"
 
 #define MAX_INPUT_LENGTH 256
+#define CMD_SIZE 2
 
 const char divider[] = ":";
 int soc;
@@ -45,7 +46,7 @@ void Client::start_client() {
 
 void Client::handle_input() {
     while (true) {
-        //printf("%s: ", username);
+        printf("[%s][@%s]: ", username, channelname);
         char input[MAX_INPUT_LENGTH];
         fgets(input, MAX_INPUT_LENGTH, stdin);
         //checks if command was used
@@ -53,11 +54,13 @@ void Client::handle_input() {
             handle_command(input);
         } else {
             //if no command was used, sends message to the channel
-            //send ccm[channel]:[message] to server
-            char message[MAX_INPUT_LENGTH + strlen(channelname)+ strlen("ccm") + strlen(divider)] = "ccm";
-            strcat(message, channelname);
-            strcat(message, divider);
-            strcat(message, input);
+            //send MSG[channel]:[message] to server
+            char message[MAX_INPUT_LENGTH + strlen(channelname) + strlen(divider) + CMD_SIZE] = {0};
+            pack_cmd(MSG, message);
+            strcat(message + CMD_SIZE, channelname);
+            strcat(message + CMD_SIZE, divider);
+            strcat(message + CMD_SIZE, input);
+            //printf("MSG: %d:%d:%s\n", message[0], message[1], message + 2);
             send_message(message);
         }
     }
@@ -65,34 +68,32 @@ void Client::handle_input() {
 
 void Client::handle_command(char input[]) {
     //send cb[cmd] to server if needed
-    char temp[MAX_INPUT_LENGTH];
+    char temp[MAX_INPUT_LENGTH + CMD_SIZE] = {0};
     if (strncmp(QUIT_CMD, input, strlen(QUIT_CMD)) == 0) {
         printf("see you soon\n");
+        send_command(QUIT);
         exit(EXIT_SUCCESS);
     } else if (strncmp(LEAVE_CMD, input, strlen(LEAVE_CMD)) == 0) {
         send_command(LEAVE);
+        memset(channelname, 0, sizeof(channelname));
     } else if (strncmp(HELP_CMD, input, strlen(HELP_CMD)) == 0) {
         list_commands();
     } else if (strncmp(JOIN_CMD, input, strlen(JOIN_CMD)) == 0) {
-        send_command(JOIN);
-        strcpy(temp, input + strlen(JOIN_CMD));
+        pack_cmd(JOIN, temp);
+        strcpy(temp + CMD_SIZE, input + strlen(JOIN_CMD));
         send_message(temp);
+        strcpy(channelname, temp+CMD_SIZE);
     } else if (strncmp(NICK_CMD, input, strlen(NICK_CMD)) == 0) {
         send_command(NICK);
-        strcpy(temp, input + strlen(NICK_CMD));
-        send_message(temp);
     } else if (strncmp(LIST_CMD, input, strlen(LIST_CMD)) == 0) {
         send_command(LIST);
     } else if (strncmp(GTOPIC_CMD, input, strlen(GTOPIC_CMD)) == 0) {
         send_command(GETTOPIC);
-        strcpy(temp, input + strlen(GTOPIC_CMD));
-        send_message(temp);
     } else if (strncmp(STOPIC_CMD, input, strlen(STOPIC_CMD)) == 0) {
         send_command(SETTOPIC);
-        strcpy(temp, input + strlen(STOPIC_CMD));
-        send_message(temp);
     } else if (strncmp(PRIVMSG_CMD, input, strlen(PRIVMSG_CMD)) == 0) {
         // send privmsg, target:channel:name
+        send_command(PRIVMSG);
     }
 }
 
@@ -117,8 +118,8 @@ void Client::send_command(short cmd) {
     }
 }
 
-void Client::send_message(char message[]) {
-    if (send(soc, message, strlen(message) + 1, 0) == -1) {
+void Client::send_message(char* message) {
+    if (send(soc, message, strlen(message+2) + CMD_SIZE, 0) == -1) {
         perror("[WARNING] an error occured while sending the message, please try again");
     }
 }

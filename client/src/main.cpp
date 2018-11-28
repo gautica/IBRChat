@@ -13,6 +13,8 @@ int main(int argc, char *argv[]) {
 
     //make a thread for user to give input and a thread to recv input from server
     client.handle_input();
-    std::thread (&Client::handle_input, client);
-    std::thread (&Client::recv_messages, client);
+    std::thread input(&Client::handle_input, client);
+    std::thread recv(&Client::recv_messages, client);
+    input.join();
+    recv.join();
 }

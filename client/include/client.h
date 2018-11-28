@@ -42,7 +42,7 @@ private:
      * @brief sends a message to the socket from the server the client is conntected to
      * @param the message the client should send
      */
-    void send_message(char message[]);
+    void send_message(char* message);
     /**
      * @brief lists all commands
      */
