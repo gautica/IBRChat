@@ -65,31 +65,31 @@ void Server::accept_connection()
                               new_client_fd);
                    }
                 } else {                        // Got message from one client
-                        int nbyte = 0;
-                        memset(revBuf, 0, sizeof (revBuf));     // clear buffer
-                        if ((nbyte = recv(i, revBuf, sizeof(revBuf), 0)) <= 0) {
-                            if (nbyte == 0) {       // client has closed connection
-                                printf("selectserver: socket %d hung up\n", i);
-                            } else {
-                                perror("recv");
-                            }
-                            close(i);
-                            FD_CLR(i, &master);
-                        } else {        // get some Data from clients or servers
-                            if (FD_ISSET(i, &server_fds)) {
-                                std::cout << "server connection revBuf: " << revBuf+CMD_SIZE << "\n";
-                                handle_server_update(i, revBuf);
-                            } else if (FD_ISSET(i, &client_fds)) {
-                                std::cout << "client connection revBuf: " << revBuf+CMD_SIZE << "\n";
-                                handle_client(i, revBuf);
-                            } else {
-                                std::cout << "first connection revBuf: " << revBuf+CMD_SIZE << "\n";
-                                handle_handshake(i, revBuf);
-                            }
+                    int nbyte = 0;
+                    memset(revBuf, 0, sizeof (revBuf));     // clear buffer
+                    if ((nbyte = recv(i, revBuf, sizeof(revBuf), 0)) <= 0) {
+                        if (nbyte == 0) {       // client has closed connection
+                            printf("selectserver: socket %d hung up\n", i);
+                        } else {
+                            perror("recv");
+                        }
+                        close(i);
+                        FD_CLR(i, &master);
+                    } else {        // get some Data from clients or servers
+                        if (FD_ISSET(i, &server_fds)) {
+                            std::cout << "server connection revBuf: " << revBuf[0] << revBuf+CMD_SIZE << "\n";
+                            handle_server_update(i, revBuf);
+                        } else if (FD_ISSET(i, &client_fds)) {
+                            std::cout << "client connection revBuf: " << revBuf[0] << revBuf+CMD_SIZE << "\n";
+                            handle_client(i, revBuf);
+                        } else {
+                            std::cout << "first connection revBuf: " << revBuf[0] << revBuf+CMD_SIZE << "\n";
+                            handle_handshake(i, revBuf);
                         }
                     }
                 }
             }
+        }
     }
 }
 
@@ -471,33 +471,8 @@ void Server::handle_client(int &sock, char *buf)
         default:
             std::cerr << "Unvalid Command from client\n";
     }
-    /**
-    if (buf[2] == 'o') {
-        std::cout << "one to one\n";
-        send_to_one(sock, buf);
-    } else if (buf[2] == 'm') {
-        std::cout << "one to many" << '\n';
-        send_to_all(sock, buf);
-    }
-    */
 }
 
-/**
-void Server::handle_disconnected(int &sock)
-{
-    // Check if a client disconnected
-    for (unsigned int i = 0; i < clients.size(); i++) {
-        if (clients.at(i).socket == sock) {
-            // Update to other servers
-
-            clients.earse(clients.begin()+i);
-            return;
-        }
-    }
-    for ()
-
-}
-*/
 bool Server::client_match_channel(char *client, char *channel)
 {
     for (auto &it : ch2c_connections) {
@@ -549,10 +524,11 @@ int Server::get_next_hop(char *server)
 void Server::send_to_one(int &sock, char *buf)
 {
     char name[NICK_SIZE] = {0};
-    char cp_buf[strlen(buf)+1] = {0};
-    strncpy(cp_buf, buf, strlen(buf));
-    char *token = strtok(cp_buf, ":");
-    strcpy(name, token+CMD_SIZE);
+    int size = strlen(buf+CMD_SIZE) + CMD_SIZE;
+    char cp_buf[size] = {0};
+    strncpy(cp_buf, buf, size);
+    char *token = strtok(cp_buf+CMD_SIZE, ":");
+    strcpy(name, token);
 
     char *channel = strtok(NULL, ":");
 
@@ -580,7 +556,7 @@ void Server::send_to_one(int &sock, char *buf)
                 std::cerr << "Cannot find client mit name " << name << "\n";
             }
         } else {
-            std::cerr << "Client [" << name << "] do not under channel [" << channel << "]" << "\n";
+            std::cerr << "Client [" << name << "] do not under channel: " << channel << "\n";
             handle_errors(sock, UNVALID_CLIENT);
         }
     }
@@ -591,21 +567,17 @@ void Server::send_to_all(int &sock, char *buf)
     // Send to all other servers
     for (auto &it : servers) {
         if (it.socket != sock) {
-            if (send(it.socket, buf, strlen(buf), 0) <= 0) {
-                std::cerr << "Failed to send to server: " << it.ID << "\n";
-            }
+            send_data(it.socket, buf);
         }
     }
     if (server_fd != 0 && sock != server_fd) {
-        if (send(server_fd, buf, strlen(buf), 0) <= 0) {
-            std::cerr << "Failed to send to server: " << "\n";
-        }
+        send_data(server_fd, buf);
     }
 
     // Send to all clients who are under same channel
-    char *token = strtok(buf, ":");
+    //char *token = strtok(buf+CMD_SIZE, ":");
     char channel[CHANNEL_SIZE];
-    strcpy(channel, token+3);
+    strcpy(channel, strtok(buf+CMD_SIZE, ":"));
     char *msg = strtok(NULL, ":");
     for (auto &it : channels) {
         if (strcmp(it.ID, channel) == 0) {
@@ -665,7 +637,7 @@ bool Server::join(int &sock, char *buf)
         for (auto &it : channels) {
            if (strcmp(it.ID, channel) == 0) {
                it.clients.push_back(clients.at(index));
-               std::cout << clients.at(index).nick << "has joined channel [" << channel << "\n";
+               std::cout << clients.at(index).nick << "has joined channel: " << channel << "\n";
                clients.erase(clients.begin() + index);
                valid_ch = true;
                break;
@@ -675,7 +647,7 @@ bool Server::join(int &sock, char *buf)
             channel_t ch;
             strcpy(ch.ID, channel);
             strcpy(ch.creator, clients.at(index).nick);        // Implementation is false for creator of channel !!!
-            std::cout << clients.at(index).nick << " create a new channel named [" << channel << "]\n";
+            std::cout << clients.at(index).nick << " create a new channel named: " << channel << "\n";
             ch.clients.push_back(clients.at(index));
             clients.erase(clients.begin() + index);
             channels.push_back(ch);
