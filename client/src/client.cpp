@@ -20,14 +20,14 @@ void Client::start_client() {
         printf("please select a username: ");
         scanf("%s", username);
         if (strlen(username) <= 9 && strlen(username) > 0) {
-            char handshake[11];
+            char handshake[12] = {0};
             pack_cmd(IC_CLIENT, handshake);
-            strcat(handshake + 2, username);
+            strcpy(handshake + 2, username);
             //send ch[username], so server can check if avaiable
             send_message(handshake);
             //recv if name was available
             char confirm[MAX_INPUT_LENGTH];
-            if (recv(soc, confirm, MAX_INPUT_LENGTH-1, 0)!= -1) {
+            if (recv(soc, confirm, MAX_INPUT_LENGTH, 0)!= -1) {
                 printf("CONFIRM: %s\n", confirm);
                 if (confirm[0] == 'H') { //Hello, I'm the server with IP: [IP]:[PORT]
                     break;
@@ -87,7 +87,10 @@ void Client::handle_command(char input[]) {
         //printf("temp: %s\n", temp+CMD_SIZE);
         strcpy(channelname, temp+CMD_SIZE);
     } else if (strncmp(NICK_CMD, input, strlen(NICK_CMD)) == 0) {
-        send_command(NICK);
+        //send_command(NICK);
+        pack_cmd(NICK, temp);
+        strcpy(temp + CMD_SIZE, input + strlen(LIST_CMD));
+        send_message(temp);
     } else if (strncmp(LIST_CMD, input, strlen(LIST_CMD)) == 0) {
         send_command(LIST);
     } else if (strncmp(GTOPIC_CMD, input, strlen(GTOPIC_CMD)) == 0) {
@@ -152,10 +155,11 @@ void Client::send_message(char* message) {
 void Client::recv_messages() {
     while (true) {
         char recvMsg[MAX_INPUT_LENGTH] = {0};
-        if (recv(soc, recvMsg, MAX_INPUT_LENGTH-1, 0) == -1) {
-            perror("[WARNING] an error occured while reciving a message");
-        }
-        printf("%s\n", recvMsg);
+        if (recv(soc, recvMsg, MAX_INPUT_LENGTH-1, 0) != -1) {
+            //perror("[WARNING] an error occured while reciving a message");
+            printf("%s\n", recvMsg);
+        } 
+        
     }
 }
 

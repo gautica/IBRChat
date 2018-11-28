@@ -130,18 +130,19 @@ private:
     /**
      * @brief update_info: to other server, if there are infos to update
      */
-    void update_info(int &socket, char* msg);
+    void update_info(int &socket, int type, char* msg);
 
     void pack_cmd(unsigned int cmd, char* buf);
     void pack_s2s_message(char* msg, s2s_t &conn);
     void pack_s2s_messages(char* msg);
-    void pack_s2c_message(char *msg, s2c_t &conn);
-    void pack_ch2c_message(char* msg, ch2c_t &conn);
 
     void add_new_client(char* buf);
     void remove_client(char* buf);
     void add_new_server(char* buf);
     void add_new_ch2c(char* buf);
+    void remove_ch2c(char* buf);
+    void leave_channel(char* buf);
+    void join_channel(char* buf);
 
     /**
      * @brief unpack_message: unpack update_info between servers
@@ -161,7 +162,6 @@ private:
     void handle_server_handshake(int &sock, char *buf);
     void handle_server_update(int &sock, char *buf);
     void handle_client_handshake(int &sock, char* buf);
-    void handle_client_update(int &sock, char*buf);
 
     /**
      * Handle client chat message
