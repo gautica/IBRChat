@@ -51,6 +51,6 @@ private:
      * @brief sends command to a server
      */
     void send_command(short cmd);
-
+    void pack_cmd(unsigned int cmd, char* buf);
 };
 
