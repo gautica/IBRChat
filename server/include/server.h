@@ -14,6 +14,7 @@
 #define NICK_SIZE 50
 #define CHANNEL_SIZE 50
 #define CHANNEL_THEMA_SIZE 500
+#define CMD_SIZE 2
 
 typedef struct {
     char nick[NICK_SIZE] = {0};
@@ -78,6 +79,8 @@ public:
         strcat(this->ID, this->port_to_client);
         FD_ZERO(&master);
         FD_ZERO(&read_fds);
+        FD_ZERO(&server_fds);
+        FD_ZERO(&client_fds);
     }
 
     void start();
@@ -90,16 +93,10 @@ private:
 
     void* get_in_addr(struct sockaddr* remote_addr);
 
-    void handshake_to_client(int &socket);
-    void handle_client_handshake(int &sock, char* buf);
-    void handle_client_update(int &sock, char*buf);
-
     /**
-     * Handle client chat message
-     * @brief handle_client
-     * @param socket
+     *  remove client/server, if client/server disconnected
      */
-    void handle_client(int &socket, char *buf);
+    void handle_disconnected(int &sock);
 
     /**
      * send 0 when username is valid, 1 if not
@@ -130,20 +127,21 @@ private:
      */
     int get_next_hop(char *dest_server);
 
-
-    void handshake_to_server(int &socket);
-    void handle_server_handshake(int &sock, char *buf);
-    void handle_server_update(int &sock, char *buf);
-
     /**
      * @brief update_info: to other server, if there are infos to update
      */
-    void update_info(int &socket, const char* msg);
+    void update_info(int &socket, char* msg);
 
+    void pack_cmd(unsigned int cmd, char* buf);
     void pack_s2s_message(char* msg, s2s_t &conn);
     void pack_s2s_messages(char* msg);
     void pack_s2c_message(char *msg, s2c_t &conn);
     void pack_ch2c_message(char* msg, ch2c_t &conn);
+
+    void add_new_client(char* buf);
+    void remove_client(char* buf);
+    void add_new_server(char* buf);
+    void add_new_ch2c(char* buf);
 
     /**
      * @brief unpack_message: unpack update_info between servers
@@ -152,15 +150,26 @@ private:
 
     void accept_connection();
 
-    void handle_recvMsg(int &sock, char* buf);
+    //void handle_recvMsg(int &sock, char* buf);
+    void handshake_to_server(int &socket);
+    void handshake_to_client(int &socket);
 
-    void send_to_one(int &sock, char *buf);
+    void handle_handshake(int &sock, char* buf);
+    void handle_server_fds();
+    void handle_client_fds();
 
-    void send_to_all(int &sock, char *buf);
+    void handle_server_handshake(int &sock, char *buf);
+    void handle_server_update(int &sock, char *buf);
+    void handle_client_handshake(int &sock, char* buf);
+    void handle_client_update(int &sock, char*buf);
 
+    /**
+     * Handle client chat message
+     * @brief handle_client
+     * @param socket
+     */
+    void handle_client(int &socket, char *buf);
     void handle_errors(int &sock, int ERROR);
-
-    void substring(char* dest, char* src, const unsigned int &start, const unsigned int &length);
 
     /***************************************************/
     /************ Handle Command ***********************/
@@ -168,14 +177,18 @@ private:
     /**
      * @brief join(): can failed, if cleint is already in a channel
      */
-    bool join(int &sock, char* channel);
-    bool leave(int &sock, char* channel);
-    bool change_nick(client_t &client, char* nick);
-    void list_channels(char* buf);
-    void get_topic(char *topic);
-    bool set_topic(char *topic);
-    bool private_Msg(char *nick);
-    void quit();
+    bool join(int &sock, char* buf);
+    bool leave(int &sock);
+    bool change_nick(int &sock, char* buf);
+    void list_channels(int &sock);
+    void get_topic(int &sock, char *topic);
+    bool set_topic(int &sock, char *topic);
+    void send_to_one(int &sock, char *buf);
+    void send_to_all(int &sock, char *buf);
+    void quit(int &sock);
+
+    void substring(char* dest, char* src, const unsigned int &start, const unsigned int &length);
+    void send_data(int &sock, char* buf);
 
 private:
     addrinfo_t lisToClient;
@@ -193,7 +206,8 @@ private:
     std::vector<s2c_t> s2c_connections;
     std::vector<ch2c_t> ch2c_connections;
 
-    fd_set master, read_fds;
+    fd_set master, read_fds, server_fds, client_fds;
+
     struct sockaddr_storage remote_addr;
     int new_client_fd;
     int server_fd = 0;
