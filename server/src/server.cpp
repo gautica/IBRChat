@@ -77,13 +77,13 @@ void Server::accept_connection()
                         FD_CLR(i, &master);
                     } else {        // get some Data from clients or servers
                         if (FD_ISSET(i, &server_fds)) {
-                            std::cout << "server connection revBuf: " << revBuf[0] << revBuf+CMD_SIZE << "\n";
+                            std::cout << "server connection revBuf: " << revBuf+CMD_SIZE << "\n";
                             handle_server_update(i, revBuf);
                         } else if (FD_ISSET(i, &client_fds)) {
-                            std::cout << "client connection revBuf: " << revBuf[0] << revBuf+CMD_SIZE << "\n";
+                            std::cout << "client connection revBuf: " << revBuf+CMD_SIZE << "\n";
                             handle_client(i, revBuf);
                         } else {
-                            std::cout << "first connection revBuf: " << revBuf[0] << revBuf+CMD_SIZE << "\n";
+                            std::cout << "first connection revBuf: " << revBuf+CMD_SIZE << "\n";
                             handle_handshake(i, revBuf);
                         }
                     }
@@ -377,7 +377,7 @@ void Server::handle_client_handshake(int &sock, char* buf)
 {
     client_t new_client;
     new_client.socket = sock;
-    strcpy(new_client.nick, buf+2);
+    strcpy(new_client.nick, buf+CMD_SIZE);
     if (!is_nick_valid(new_client.nick)) {
         handle_errors(sock, UNVALID_NICK);
         return;
@@ -460,6 +460,7 @@ void Server::handle_client(int &sock, char *buf)
             set_topic(sock, buf);
             break;
         case MSG:
+            std::cout << "sent to all\n";
             send_to_all(sock, buf);
             break;
         case PRIVMSG:
@@ -564,6 +565,7 @@ void Server::send_to_one(int &sock, char *buf)
 
 void Server::send_to_all(int &sock, char *buf)
 {
+    std::cout << "in send to all\n";
     // Send to all other servers
     for (auto &it : servers) {
         if (it.socket != sock) {
@@ -577,12 +579,19 @@ void Server::send_to_all(int &sock, char *buf)
     // Send to all clients who are under same channel
     //char *token = strtok(buf+CMD_SIZE, ":");
     char channel[CHANNEL_SIZE];
-    strcpy(channel, strtok(buf+CMD_SIZE, ":"));
+    char temp[strlen(buf+CMD_SIZE)] = {0};
+    strcpy(temp, buf+CMD_SIZE);
+
+    //char* token = strtok(buf+CMD_SIZE, ":");
+    std::cout << "temp " << temp  << "\n";
+    strcpy(channel, strtok(temp, ":"));
     char *msg = strtok(NULL, ":");
+    std::cout << "msg" << msg << "\n";
     for (auto &it : channels) {
         if (strcmp(it.ID, channel) == 0) {
             for (auto &client : it.clients) {
                 if (client.socket != sock) {        // Don't send to him self
+                    std::cout << "socket: " << client.socket << "\n";
                     if (send(client.socket, msg, sizeof(msg), 0) <= 0) {
                         perror("send");
                         std::cerr << "Failed to send message to client [" << client.nick << "]" << "\n";
@@ -652,6 +661,7 @@ bool Server::join(int &sock, char *buf)
             clients.erase(clients.begin() + index);
             channels.push_back(ch);
         }
+        std::cout << "conn.conn: " << conn.conn << "\n";
         // Send update info to other servers
         char buf[sizeof(conn.conn)+4];
         pack_ch2c_message(buf, conn);
