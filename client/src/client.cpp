@@ -29,7 +29,7 @@ void Client::start_client() {
             char confirm[MAX_INPUT_LENGTH];
             if (recv(soc, confirm, MAX_INPUT_LENGTH, 0)!= -1) {
                 printf("CONFIRM: %s\n", confirm);
-                if (confirm[0] == 'H') { //Hello, I'm the server with IP: [IP]:[PORT]
+                if (confirm[0] == VALID_CLIENT_NAME) { //Hello, I'm the server with IP: [IP]:[PORT]
                     break;
                 } else {
                     printf("[SERVER]: %s\n", confirm);
@@ -97,14 +97,14 @@ void Client::handle_command(char input[]) {
         send_message(temp);
         //recv 0 when name was accepted, 1 if not
         char buf[2] = {0};
-        if (recv(soc, buf, strlen(buf), 0) != -1) {
-            if (buf[0] == '0') {
+        if (recv(soc, buf, sizeof(buf), 0) != -1) {
+            if (buf[0] == VALID_CLIENT_NAME) {
                 strncpy(username, temp+CMD_SIZE, sizeof(username));
             }
         } else {
             perror("Could not change username, please try again");
         }
-        printf("[%d%d%s]", temp[0], temp[1], temp + CMD_SIZE);
+        //printf("[%d%d%s]", temp[0], temp[1], temp + CMD_SIZE);
     } else if (strncmp(LIST_CMD, input, strlen(LIST_CMD)) == 0) {
         send_command(LIST);
     } else if (strncmp(GTOPIC_CMD, input, strlen(GTOPIC_CMD)) == 0) {
@@ -135,6 +135,16 @@ void Client::handle_command(char input[]) {
         strcpy(temp + CMD_SIZE + strlen(channelname), divider);
         strcpy(temp + CMD_SIZE + strlen(channelname) + strlen(divider), input + strlen(PRIVMSG_CMD));
         send_message(temp);
+        char buf[2] = {0};
+        if (recv(soc, buf, sizeof(buf), 0) != -1) {
+            if (buf[0] == VALID_CLIENT) {
+                printf("message send\n");
+            } else if (buf[0] == UNVALID_CLIENT) {
+                printf("client not found in the current channel, message could not been send\n");
+            } else {
+                printf("unknown error, could not send message\n");
+            }
+        }
         //printf("PRIVMSG: %d%d%s\n", temp[0], temp[1], temp+2);
     }
 }
@@ -171,9 +181,10 @@ void Client::recv_messages() {
         char recvMsg[MAX_INPUT_LENGTH] = {0};
         if (recv(soc, recvMsg, MAX_INPUT_LENGTH-1, 0) != -1) {
             //perror("[WARNING] an error occured while reciving a message");
-            printf("%s\n", recvMsg);
-        } 
-        
+            if (strlen(recvMsg) > 0) {
+                printf("%s\n", recvMsg);
+            }
+        }       
     }
 }
 
