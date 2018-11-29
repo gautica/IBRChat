@@ -50,11 +50,6 @@ typedef struct {
     addrinfo* addr_info;
 } addrinfo_t;
 
-enum ERROR {
-    UNVALID_NICK,
-    UNVALID_CLIENT
-};
-
 class Server
 {
 public:
@@ -169,7 +164,7 @@ private:
      * @param socket
      */
     void handle_client(int &socket, char *buf);
-    void handle_errors(int &sock, int ERROR);
+    void handle_confirm(int &sock, int confirm);
 
     /***************************************************/
     /************ Handle Command ***********************/

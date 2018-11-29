@@ -369,7 +369,7 @@ void Server::handle_client_handshake(int &sock, char* buf)
     new_client.socket = sock;
     strcpy(new_client.nick, buf+CMD_SIZE);
     if (!is_nick_valid(new_client.nick)) {
-        handle_errors(sock, UNVALID_NICK);
+        handle_confirm(sock, UNVALID_CLIENT_NAME);
         return;
     }
     clients.push_back(new_client);
@@ -507,6 +507,8 @@ void Server::send_to_one(int &sock, char *buf)
         char* token = strtok(NULL, ":");
         if (send(fd, token, strlen(token), 0) <= 0) {   // send message direct to client
             std::cout << "Failed to send to client " << name << "\n";
+        } else {
+            handle_confirm(sock, VALID_CLIENT);
         }
     } else {
         char server[INET6_ADDRSTRLEN] = {0};
@@ -517,6 +519,8 @@ void Server::send_to_one(int &sock, char *buf)
                 if (fd > 0) {
                     if (send(fd, buf, strlen(buf), 0) <= 0) {   // send message direct to client
                         std::cout << "Failed to send to server " << server << "\n";
+                    } else {
+                        handle_confirm(sock, VALID_CLIENT);
                     }
                 } else {
                     std::cerr << "Cannot find next hop\n";
@@ -527,7 +531,7 @@ void Server::send_to_one(int &sock, char *buf)
             }
         } else {
             std::cerr << "Client [" << name << "] do not under channel: " << channel << "\n";
-            handle_errors(sock, UNVALID_CLIENT);
+            handle_confirm(sock, UNVALID_CLIENT);
         }
     }
 }
@@ -569,20 +573,26 @@ void Server::send_to_all(int &sock, char *buf)
     }
 }
 
-void Server::handle_errors(int &sock, int ERROR)
+void Server::handle_confirm(int &sock, int ERROR)
 {
-    char err_buf[100] = {0};
+    char buf[2] = {0};
     switch (ERROR) {
-        case UNVALID_NICK:
-            strcpy(err_buf, "0");
+        case UNVALID_CLIENT_NAME:
+            pack_cmd(UNVALID_CLIENT_NAME, buf);
             break;
         case UNVALID_CLIENT:
-            strcpy(err_buf, "This Client is not found under the channel, Please check if the client and channel are valid\n");
+            pack_cmd(UNVALID_CLIENT, buf);
+            break;
+        case VALID_CLIENT:
+            pack_cmd(VALID_CLIENT, buf);
+            break;
+        case VALID_CLIENT_NAME:
+            pack_cmd(VALID_CLIENT_NAME, buf);
             break;
         default:
             break;
     }
-    if (send(sock, err_buf, strlen(err_buf), 0) <= 0) {
+    if (send(sock, buf, sizeof(buf), 0) <= 0) {
         std::cerr << "Failed to handle error to client\n";
     }
 }
@@ -662,11 +672,10 @@ bool Server::change_nick(int &sock, char* buf)
     char name[NICK_SIZE] = {0};
     strcpy(name, buf+CMD_SIZE);
     if (!is_nick_valid(name)) {
-        handle_errors(sock, UNVALID_NICK);
+        handle_confirm(sock, UNVALID_CLIENT_NAME);
         return false;
     } else {
-        char buf[] = "1";
-        send(sock, buf, sizeof(buf), 0);
+        handle_confirm(sock, VALID_CLIENT_NAME);
     }
     s2c_t conn;
     strcpy(conn.conn, this->ID);
