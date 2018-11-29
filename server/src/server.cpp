@@ -315,15 +315,6 @@ void Server::handshake_to_server(int &socket)
     handle_server_update(socket, msgC);
 }
 
-void Server::handshake_to_client(int &socket)
-{
-    char msg[BUFFER_SIZE] = "Hello, I'm server with IP:";
-    strcat(msg, this->ID);
-    if (send(socket, msg, sizeof (msg), 0) <= 0) {
-        std::cerr << "Failed to send handshake to new client\n";
-    }
-}
-
 void Server::handle_server_handshake(int &sock, char* buf)
 {
     server_t new_serv;
@@ -363,15 +354,16 @@ void Server::handle_server_update(int &sock,  char* buf)
     unpack_update_info(buf);
 }
 
-void Server::handle_client_handshake(int &sock, char* buf)
+bool Server::handle_client_handshake(int &sock, char* buf)
 {
+    if (!is_nick_valid(buf+CMD_SIZE)) {
+        handle_confirm(sock, UNVALID_CLIENT_NAME);
+        return false;
+    }
+
     client_t new_client;
     new_client.socket = sock;
     strcpy(new_client.nick, buf+CMD_SIZE);
-    if (!is_nick_valid(new_client.nick)) {
-        handle_confirm(sock, UNVALID_CLIENT_NAME);
-        return;
-    }
     clients.push_back(new_client);
     std::cout << "new client " << new_client.nick << " has connected\n";
     std::cout << "server has " << clients.size() << " clients\n";
@@ -383,7 +375,8 @@ void Server::handle_client_handshake(int &sock, char* buf)
     strcat(conn.conn, new_client.nick);
 
     update_info(sock, SC_CLIENT_NEW, conn.conn);
-    handshake_to_client(sock);
+    handle_confirm(sock, VALID_CLIENT_NAME);
+    return true;
 }
 
 bool Server::is_nick_valid(char *nick)
@@ -412,6 +405,9 @@ bool Server::is_nick_valid(char *nick)
 void Server::handle_client(int &sock, char *buf)
 {
     switch (*((short*) buf)) {
+        case IC_CLIENT:
+            handle_client_handshake(sock, buf);
+            break;
         case JOIN:
             join(sock, buf);
             break;

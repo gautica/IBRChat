@@ -148,7 +148,6 @@ private:
 
     //void handle_recvMsg(int &sock, char* buf);
     void handshake_to_server(int &socket);
-    void handshake_to_client(int &socket);
 
     void handle_handshake(int &sock, char* buf);
     void handle_server_fds();
@@ -156,7 +155,7 @@ private:
 
     void handle_server_handshake(int &sock, char *buf);
     void handle_server_update(int &sock, char *buf);
-    void handle_client_handshake(int &sock, char* buf);
+    bool handle_client_handshake(int &sock, char* buf);
 
     /**
      * Handle client chat message

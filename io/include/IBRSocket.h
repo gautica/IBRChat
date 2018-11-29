@@ -1,4 +1,6 @@
 enum Command{
+    IC_SERVER,
+    IC_CLIENT,
 	JOIN,
 	LEAVE,
 	NICK,
@@ -22,12 +24,12 @@ enum ServerCommand{
 	SC_MSG,
 	SC_PRIVMSG
 };
-
+/**
 enum InitCommand{
 	IC_SERVER,
 	IC_CLIENT
 };
-
+*/
 enum CONFIRM {
     UNVALID_CLIENT_NAME,
     VALID_CLIENT_NAME,
