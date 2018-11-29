@@ -27,3 +27,10 @@ enum InitCommand{
 	IC_SERVER,
 	IC_CLIENT
 };
+
+enum CONFIRM {
+    UNVALID_CLIENT_NAME,
+    VALID_CLIENT_NAME,
+    UNVALID_CLIENT,
+    VALID_CLIENT
+};

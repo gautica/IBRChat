@@ -89,7 +89,7 @@ void Client::handle_command(char input[]) {
     } else if (strncmp(NICK_CMD, input, strlen(NICK_CMD)) == 0) {
         //send_command(NICK);
         pack_cmd(NICK, temp);
-        strcpy(temp + CMD_SIZE, input + strlen(LIST_CMD));
+        strcpy(temp + CMD_SIZE, input + strlen(NICK_CMD));
         send_message(temp);
     } else if (strncmp(LIST_CMD, input, strlen(LIST_CMD)) == 0) {
         send_command(LIST);
