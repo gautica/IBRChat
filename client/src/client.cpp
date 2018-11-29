@@ -61,7 +61,7 @@ void Client::handle_input() {
                 strcat(message + CMD_SIZE, channelname);
                 strcat(message + CMD_SIZE, divider);
                 strcat(message + CMD_SIZE, input);
-                printf("MSG: %d:%d:%s\n", message[0], message[1], message + CMD_SIZE);
+                //printf("MSG: %d:%d:%s\n", message[0], message[1], message + CMD_SIZE);
                 send_message(message);
             }
         }
@@ -87,10 +87,24 @@ void Client::handle_command(char input[]) {
         //printf("temp: %s\n", temp+CMD_SIZE);
         strcpy(channelname, temp+CMD_SIZE);
     } else if (strncmp(NICK_CMD, input, strlen(NICK_CMD)) == 0) {
-        //send_command(NICK);
+        //check if new username got the right size
+        if(strlen(input) - strlen(NICK_CMD) >= 9) {
+            return;
+        }
+        //send [NICK][username] to server
         pack_cmd(NICK, temp);
-        strcpy(temp + CMD_SIZE, input + strlen(LIST_CMD));
+        strcpy(temp + CMD_SIZE, input + strlen(NICK_CMD));
         send_message(temp);
+        //recv 0 when name was accepted, 1 if not
+        char buf[2] = {0};
+        if (recv(soc, buf, strlen(buf), 0) != -1) {
+            if (buf[0] == '0') {
+                strncpy(username, temp+CMD_SIZE, sizeof(username));
+            }
+        } else {
+            perror("Could not change username, please try again");
+        }
+        printf("[%d%d%s]", temp[0], temp[1], temp + CMD_SIZE);
     } else if (strncmp(LIST_CMD, input, strlen(LIST_CMD)) == 0) {
         send_command(LIST);
     } else if (strncmp(GTOPIC_CMD, input, strlen(GTOPIC_CMD)) == 0) {
