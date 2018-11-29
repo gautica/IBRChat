@@ -574,7 +574,7 @@ void Server::handle_errors(int &sock, int ERROR)
     char err_buf[100] = {0};
     switch (ERROR) {
         case UNVALID_NICK:
-            strcpy(err_buf, "Your name is already reserved, Please change another name\n");
+            strcpy(err_buf, "0");
             break;
         case UNVALID_CLIENT:
             strcpy(err_buf, "This Client is not found under the channel, Please check if the client and channel are valid\n");
@@ -637,7 +637,7 @@ bool Server::join(int &sock, char *buf)
 bool Server::leave(int &sock)
 {
     ch2c_t conn;
-    for (auto channel : channels) {
+    for (auto &channel : channels) {
         for (unsigned int i = 0; i < channel.clients.size(); i++) {
             if (sock == channel.clients.at(i).socket) {
                 strcpy(conn.conn, channel.ID);
@@ -661,6 +661,13 @@ bool Server::change_nick(int &sock, char* buf)
     bool isFound = false;
     char name[NICK_SIZE] = {0};
     strcpy(name, buf+CMD_SIZE);
+    if (!is_nick_valid(name)) {
+        handle_errors(sock, UNVALID_NICK);
+        return false;
+    } else {
+        char buf[] = "1";
+        send(sock, buf, sizeof(buf), 0);
+    }
     s2c_t conn;
     strcpy(conn.conn, this->ID);
     strcat(conn.conn, "-");
@@ -683,7 +690,7 @@ bool Server::change_nick(int &sock, char* buf)
         }
     }
     if (!isFound) {
-        for (auto channel : channels) {
+        for (auto &channel : channels) {
             for (unsigned int i = 0; i < channel.clients.size(); i++) {
                 if (sock == channel.clients.at(i).socket) {
                     ch2c_t conn_ch2c;
@@ -707,7 +714,7 @@ bool Server::change_nick(int &sock, char* buf)
                     std::cout << "name: " << name << "\n";
                     strcpy(channel.clients.at(i).nick, name);
                     for (auto &client : channel.clients)
-                        std::cout << "nick: " << client.nick << "\n";
+                        std::cout << channel.ID << " has nick: " << client.nick << "\n";
                 }
             }   
         }
