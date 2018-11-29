@@ -29,7 +29,7 @@ void Client::start_client() {
             char confirm[MAX_INPUT_LENGTH];
             if (recv(soc, confirm, MAX_INPUT_LENGTH, 0)!= -1) {
                 printf("CONFIRM: %s\n", confirm);
-                if (confirm[0] == VALID_CLIENT_NAME) { //Hello, I'm the server with IP: [IP]:[PORT]
+                if (*((short*)confirm) == VALID_CLIENT_NAME) {
                     break;
                 } else {
                     printf("[SERVER]: %s\n", confirm);
@@ -98,7 +98,7 @@ void Client::handle_command(char input[]) {
         //recv 0 when name was accepted, 1 if not
         char buf[2] = {0};
         if (recv(soc, buf, sizeof(buf), 0) != -1) {
-            if (buf[0] == VALID_CLIENT_NAME) {
+            if (*((short*)buf) == VALID_CLIENT_NAME) {
                 strncpy(username, temp+CMD_SIZE, sizeof(username));
             }
         } else {
@@ -137,9 +137,9 @@ void Client::handle_command(char input[]) {
         send_message(temp);
         char buf[2] = {0};
         if (recv(soc, buf, sizeof(buf), 0) != -1) {
-            if (buf[0] == VALID_CLIENT) {
+            if (*((short*)buf) == VALID_CLIENT) {
                 printf("message send\n");
-            } else if (buf[0] == UNVALID_CLIENT) {
+            } else if (*((short*)buf) == UNVALID_CLIENT) {
                 printf("client not found in the current channel, message could not been send\n");
             } else {
                 printf("unknown error, could not send message\n");
