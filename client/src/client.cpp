@@ -18,27 +18,29 @@ char channelname[12]; //max. length is 12
 void Client::start_client() {
     while(true) {
         printf("please select a username: ");
-        scanf("%s", username);
-        if (strlen(username) <= 9 && strlen(username) > 0) {
-            char handshake[12] = {0};
-            pack_cmd(IC_CLIENT, handshake);
-            strcpy(handshake + 2, username);
-            //send ch[username], so server can check if avaiable
-            send_message(handshake);
-            //recv if name was available
-            char confirm[MAX_INPUT_LENGTH];
-            if (recv(soc, confirm, MAX_INPUT_LENGTH, 0)!= -1) {
-                printf("CONFIRM: %s\n", confirm);
-                if (*((short*)confirm) == VALID_CLIENT_NAME) {
-                    break;
-                } else {
-                    printf("[SERVER]: %s\n", confirm);
-                }
+        char input[MAX_INPUT_LENGTH];
+        fgets(input, MAX_INPUT_LENGTH, stdin);
+        if(strlen(input) > 10) {
+            printf("[WARNING] username too long/short, please try again [1-9] letters\n");
+            continue;
+        }
+        input[strcspn(input, "\n")] = 0; //delete \n from fgets
+        strncpy(username, input, 9);
+        char handshake[12] = {0};
+        pack_cmd(IC_CLIENT, handshake);
+        strcpy(handshake + 2, username);
+        //send ch[username], so server can check if avaiable
+        send_message(handshake);
+        //recv if name was available
+        char confirm[MAX_INPUT_LENGTH];
+        if (recv(soc, confirm, MAX_INPUT_LENGTH, 0)!= -1) {
+            if (*((short*)confirm) == VALID_CLIENT_NAME) {
+                break;
             } else {
-                printf("[WARNING] could not handshake with the server\n");
+                printf("this name is already in use - ");
             }
         } else {
-            printf("[WARNING] username too long/short, please try again [1-9] letters\n");
+            printf("[WARNING] could not handshake with the server\n");
         }
     }
     printf("your username was set to [%s]\n", username);
@@ -49,6 +51,7 @@ void Client::handle_input() {
         printf("[%s][@%s]: ", username, channelname);
         char input[MAX_INPUT_LENGTH];
         if (fgets(input, MAX_INPUT_LENGTH, stdin) != NULL) {
+            printf("INPUT: %s", input);
             input[strcspn(input, "\n")] = 0;
             //checks if command was used
             if (input[0] == '/') {
