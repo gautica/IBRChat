@@ -110,7 +110,7 @@ void Client::handle_command(char input[]) {
         strcpy(channelname, temp+CMD_SIZE);
     } else if (strncmp(NICK_CMD, input, strlen(NICK_CMD)) == 0) {
         //check if new username got the right size
-        if(strlen(input) - strlen(NICK_CMD) >= 9) {
+        if(strlen(input) - strlen(NICK_CMD) > 9) {
             printf("[WARNING] username too long/short, please try again [1-9] letters\n");
             return;
         }
@@ -136,7 +136,7 @@ void Client::handle_command(char input[]) {
         } else {
             perror("Could not change username, please try again");
         }
-        //printf("[%d%d%s]", temp[0], temp[1], temp + CMD_SIZE);
+        printf("[%d%d%s]", temp[0], temp[1], temp + CMD_SIZE);
     } else if (strncmp(LIST_CMD, input, strlen(LIST_CMD)) == 0) {
         send_command(LIST);
         printf("\n known channels:\n");
@@ -150,7 +150,9 @@ void Client::handle_command(char input[]) {
             }
         }
         strcpy(temp + CMD_SIZE, input + strlen(GTOPIC_CMD));
+        printf("\nTOPIC:");
         send_message(temp);
+        printf("\n");
     } else if (strncmp(STOPIC_CMD, input, strlen(STOPIC_CMD)) == 0) {
         //send settopic channel:newTopic
         pack_cmd(SETTOPIC, temp);
@@ -216,7 +218,7 @@ void Client::recv_messages() {
         if (recv(soc, recvMsg, MAX_INPUT_LENGTH-1, 0) != -1) {
             //perror("[WARNING] an error occured while reciving a message");
             if (strlen(recvMsg) > 0) {
-                printf("%s\n", recvMsg);
+                printf("\n%s\n", recvMsg);
             }
         }       
     }
