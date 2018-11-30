@@ -69,6 +69,9 @@ void Server::accept_connection()
                         }
                         close(i);
                         FD_CLR(i, &master);
+                        FD_CLR(i, &server_fds);
+                        FD_CLR(i, &client_fds);
+                        quit(i);
                     } else {        // get some Data from clients or servers
                         if (FD_ISSET(i, &server_fds)) {
                             std::cout << "server connection revBuf: " << revBuf+CMD_SIZE << "\n";
@@ -140,15 +143,11 @@ void Server::add_new_server(char* msg)
 {
     s2s_t conn;
     char* token = strtok(msg+CMD_SIZE, ";");
-    printf("token: %s\n", token);
     strcpy(conn.conn, token);
-    printf("conn.conn: %s\n", conn.conn);
     s2s_connections.push_back(conn);
 
     token = strtok(NULL, ";");
     while(token != NULL) {
-        std::cout << "unpack_update_info\n";
-        printf("token: %s\n", token);
         strcpy(conn.conn, token);
         s2s_connections.push_back(conn);
         token = strtok(NULL, ";");
@@ -292,7 +291,6 @@ void Server::pack_s2s_messages(char* msg)
 
 void Server::unpack_update_info(int &sock, char* msg)
 {
-    std::cout << "unpack_update_info: " << msg+CMD_SIZE << '\n';
     switch (*((short*) msg)) {
         case SC_CLIENT_NEW:
             add_new_client(msg);
@@ -374,7 +372,16 @@ void Server::handle_server_update(int &sock,  char* buf)
         strcat(conn.conn, strtok(NULL, "-"));
 
         update_info(sock, SC_CLIENT_NEW, conn.conn);
-    } else {
+    } else if (*((short*) buf) == SC_CLIENT_REMOVE) {
+        s2c_t conn;
+        strcpy(conn.conn, this->ID);
+        strcat(conn.conn, "-");
+        strcpy(temp, buf+CMD_SIZE);
+        strtok(temp, "-");
+        strcat(conn.conn, strtok(NULL, "-"));
+
+        update_info(sock, SC_CLIENT_REMOVE, conn.conn);
+    } else if (*((short*) buf) != SC_MSG && *((short*) buf) != SC_PRIVMSG) {
         update_info(sock, *((short*) buf), buf+CMD_SIZE);
     }
 
@@ -471,6 +478,7 @@ void Server::handle_client(int &sock, char *buf)
             send_to_one(sock, buf);
             break;
         case QUIT:
+            std::cout << "client quit\n";
             quit(sock);
             break;
         default:
@@ -551,9 +559,7 @@ void Server::send_to_one(int &sock, char *buf)
         char server[INET6_ADDRSTRLEN] = {0};
         if (client_match_channel(name, channel)) {
             if (get_server(name, server)) {
-                std::cout << "server: " << server << "\n";
                 fd = get_next_hop(server);
-                printf("fd: %d\n", fd);
                 if (fd > 0) {
                     if (*((short*) buf) != SC_PRIVMSG) {
                         handle_confirm(sock, VALID_CLIENT);
@@ -583,16 +589,12 @@ void Server::send_to_all(int &sock, char *buf)
     char channel[CHANNEL_SIZE];
     char temp[strlen(buf+CMD_SIZE)+1] = {0};
     strcpy(temp, buf+CMD_SIZE);
-
-    std::cout << "temp " << temp  << "\n";
     strcpy(channel, strtok(temp, ":"));
     char *msg = strtok(NULL, ":");
-    std::cout << "msg" << msg << "\n";
     for (auto &it : channels) {
         if (strcmp(it.ID, channel) == 0) {
             for (auto &client : it.clients) {
                 if (client.socket != sock) {        // Don't send to him self
-                    std::cout << "socket: " << client.socket << "\n";
                     if (send(client.socket, msg, sizeof(msg), 0) <= 0) {
                         perror("send");
                         std::cerr << "Failed to send message to client [" << client.nick << "]" << "\n";
@@ -606,7 +608,7 @@ void Server::send_to_all(int &sock, char *buf)
 
 void Server::handle_confirm(int &sock, int confirm)
 {
-    char buf[2] = {0};
+    char buf[3] = {0};
     switch (confirm) {
         case UNVALID_CLIENT_NAME:
             pack_cmd(UNVALID_CLIENT_NAME, buf);
@@ -823,7 +825,39 @@ void Server::set_topic(int &sock, char *topic)
 
 void Server::quit(int &sock)
 {
+    // Not in a channel
+    for (unsigned int i = 0; i < clients.size(); i++) {
+        if (clients.at(i).socket == sock) {
+            s2c_t conn;
+            strcpy(conn.conn, this->ID);
+            strcat(conn.conn, "-");
+            strcat(conn.conn, clients.at(i).nick);
+            update_info(sock, SC_CLIENT_REMOVE, conn.conn);
+            clients.erase(clients.begin()+i);
+            return;
+        }
+    }
+    // In a channel
+    for (auto &channel : channels) {
+        for (unsigned int i = 0; i < channel.clients.size(); i++) {
+            if (channel.clients.at(i).socket == sock) {
+                ch2c_t ch_conn;
+                strcpy(ch_conn.conn, channel.ID);
+                strcat(ch_conn.conn, ":");
+                strcat(ch_conn.conn, channel.clients.at(i).nick);
+                update_info(sock, SC_CLIENT_LEAVE_CHANNEL, ch_conn.conn);
 
+                s2c_t conn;
+                strcpy(conn.conn, this->ID);
+                strcat(conn.conn, "-");
+                strcat(conn.conn, channel.clients.at(i).nick);
+                update_info(sock, SC_CLIENT_REMOVE, conn.conn);
+
+                channel.clients.erase(channel.clients.begin()+i);
+                return;
+            }
+        }
+    }
 }
 
 void Server::substring(char* dest, char* src, const unsigned int &start, const unsigned int &length)
