@@ -113,18 +113,19 @@ void Client::handle_command(char input[]) {
     } else if (strncmp(GTOPIC_CMD, input, strlen(GTOPIC_CMD)) == 0) {
         //send gettopic channel
         pack_cmd(GETTOPIC, temp);
+        for (int i = strlen(GTOPIC_CMD); i < strlen(input); i++) {
+            if (input[i] == ' ') {
+                input[i] == ':';
+                break;
+            }
+        }
         strcpy(temp + CMD_SIZE, input + strlen(GTOPIC_CMD));
         send_message(temp);
     } else if (strncmp(STOPIC_CMD, input, strlen(STOPIC_CMD)) == 0) {
         //send settopic channel:newTopic
         pack_cmd(SETTOPIC, temp);
-        for(int i = strlen(STOPIC_CMD); i < strlen(input); i++) {
-            if(input[i] == ' ') {
-                input[i] = ':';
-                break;
-            }
-        }
         strcpy(temp + CMD_SIZE, input + strlen(STOPIC_CMD));
+        send_message(temp);
     } else if (strncmp(PRIVMSG_CMD, input, strlen(PRIVMSG_CMD)) == 0) {
         //send privmsg channel:user:message
         pack_cmd(PRIVMSG, temp);

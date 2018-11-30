@@ -13,7 +13,7 @@
 #define BUFFER_SIZE 1024
 #define NICK_SIZE 50
 #define CHANNEL_SIZE 50
-#define CHANNEL_THEMA_SIZE 500
+#define CHANNEL_TOPIC_SIZE 500
 #define CMD_SIZE 2
 
 typedef struct {
@@ -29,7 +29,7 @@ typedef struct {
 typedef struct {
     char ID[CHANNEL_SIZE] = {0};
     char creator[NICK_SIZE] = {0};
-    char thema[CHANNEL_THEMA_SIZE] = {0};
+    char topic[CHANNEL_TOPIC_SIZE] = {0};
     std::vector<client_t> clients;
 } channel_t;
 
@@ -44,6 +44,10 @@ typedef struct {
 typedef struct {
     char conn[CHANNEL_SIZE+NICK_SIZE+2] = {0};
 } ch2c_t;
+
+typedef struct {
+    char conn[CHANNEL_SIZE+CHANNEL_TOPIC_SIZE+1] = {0};
+} ch_topic;
 
 typedef struct {
     struct addrinfo hints;
@@ -138,11 +142,12 @@ private:
     void remove_ch2c(char* buf);
     void leave_channel(char* buf);
     void join_channel(char* buf);
+    void set_channel_topic(char* buf);
 
     /**
      * @brief unpack_message: unpack update_info between servers
      */
-    void unpack_update_info(char* msg);
+    void unpack_update_info(int &sock, char* msg);
 
     void accept_connection();
 
@@ -171,12 +176,12 @@ private:
     /**
      * @brief join(): can failed, if cleint is already in a channel
      */
-    bool join(int &sock, char* buf);
-    bool leave(int &sock);
-    bool change_nick(int &sock, char* buf);
+    void join(int &sock, char* buf);
+    void leave(int &sock);
+    void change_nick(int &sock, char* buf);
     void list_channels(int &sock);
     void get_topic(int &sock, char *topic);
-    bool set_topic(int &sock, char *topic);
+    void set_topic(int &sock, char *topic);
     void send_to_one(int &sock, char *buf);
     void send_to_all(int &sock, char *buf);
     void quit(int &sock);
@@ -199,6 +204,7 @@ private:
     std::vector<s2s_t> s2s_connections;
     std::vector<s2c_t> s2c_connections;
     std::vector<ch2c_t> ch2c_connections;
+    std::vector<ch_topic> ch_topics;
 
     fd_set master, read_fds, server_fds, client_fds;
 
