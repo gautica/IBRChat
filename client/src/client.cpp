@@ -74,6 +74,11 @@ void Client::handle_input() {
                 pack_cmd(MSG, message);
                 strcat(message + CMD_SIZE, channelname);
                 strcat(message + CMD_SIZE, divider);
+                strcat(message + CMD_SIZE, "[");
+                strcat(message + CMD_SIZE, username);
+                strcat(message + CMD_SIZE, "][@");
+                strcat(message + CMD_SIZE, channelname);
+                strcat(message + CMD_SIZE, "]: ");
                 strcat(message + CMD_SIZE, input);
                 //printf("MSG: %d:%d:%s\n", message[0], message[1], message + CMD_SIZE);
                 send_message(message);
@@ -88,7 +93,7 @@ void Client::handle_command(char input[]) {
     if (strncmp(QUIT_CMD, input, strlen(QUIT_CMD)) == 0) {
         printf("see you soon\n");
         send_command(QUIT);
-        //exit(EXIT_SUCCESS);
+        exit(EXIT_SUCCESS);
     } else if (strncmp(LEAVE_CMD, input, strlen(LEAVE_CMD)) == 0) {
         if (strlen(channelname) < 1) {
             printf("[ERROR] not member in a channel\n");
@@ -162,26 +167,23 @@ void Client::handle_command(char input[]) {
         //send privmsg channel:user:message
         pack_cmd(PRIVMSG, temp);
         strcpy(temp + CMD_SIZE, channelname);
+        strcat(temp + CMD_SIZE, divider);
+
         for(int i = strlen(PRIVMSG_CMD); i < strlen(input); i++) {
             if(input[i] == ' ') {
-                input[i] = ':';
+                strncat(temp+CMD_SIZE, input + strlen(PRIVMSG_CMD), i-strlen(PRIVMSG_CMD));
+                strcat(temp + CMD_SIZE, divider);
+                strcat(temp + CMD_SIZE, "[");
+                strcat(temp + CMD_SIZE, username);
+                strcat(temp + CMD_SIZE, "][@");
+                strcat(temp + CMD_SIZE, channelname);
+                strcat(temp + CMD_SIZE, "]: ");
+                strcat(temp + CMD_SIZE, input + i + 1);
                 break;
             }
         }
-        strcpy(temp + CMD_SIZE + strlen(channelname), divider);
-        strcpy(temp + CMD_SIZE + strlen(channelname) + strlen(divider), input + strlen(PRIVMSG_CMD));
+
         send_message(temp);
-        char buf[2] = {0};
-        if (recv(soc, buf, sizeof(buf), 0) != -1) {
-            if (*((short*)buf) == VALID_CLIENT) {
-                printf("message send\n");
-            } else if (*((short*)buf) == UNVALID_CLIENT) {
-                printf("client not found in the current channel, message could not been send\n");
-            } else {
-                printf("unknown error, could not send message\n");
-            }
-        }
-        //printf("PRIVMSG: %d%d%s\n", temp[0], temp[1], temp+2);
     }
 }
 
@@ -217,9 +219,16 @@ void Client::recv_messages() {
         char recvMsg[MAX_INPUT_LENGTH] = {0};
         if (recv(soc, recvMsg, MAX_INPUT_LENGTH-1, 0) != -1) {
             //perror("[WARNING] an error occured while reciving a message");
-            if (strlen(recvMsg) > 0) {
-                printf("\n%s\n", recvMsg);
+            if (*((short*)recvMsg) == UNVALID_CLIENT) {
+                printf("client not found in the current channel, message could not been send\n");
+            } else if (*((short*)recvMsg) == VALID_CLIENT || *((short*)recvMsg) == VALID_CLIENT_NAME) {
+                // do nothing
+            } else {
+                if (strlen(recvMsg) > 0) {
+                    printf("\n%s\n", recvMsg);
+                }
             }
+
         }       
     }
 }

@@ -547,8 +547,8 @@ void Server::send_to_one(int &sock, char *buf)
 
     int fd = get_fd(name, channel);
     if (fd != -1) {
-        char* token = strtok(NULL, ":");
-        if (send(fd, token, strlen(token), 0) <= 0) {   // send message direct to client
+        int size = strlen(name) + strlen(channel) + CMD_SIZE + 2;
+        if (send(fd, buf+size, strlen(buf+size), 0) <= 0) {   // send message direct to client
             std::cout << "Failed to send to client " << name << "\n";
         } else {
             if (*((short*) buf) != SC_PRIVMSG) {
@@ -589,13 +589,13 @@ void Server::send_to_all(int &sock, char *buf)
     char channel[CHANNEL_SIZE];
     char temp[strlen(buf+CMD_SIZE)+1] = {0};
     strcpy(temp, buf+CMD_SIZE);
-    strcpy(channel, strtok(temp, ":"));
-    char *msg = strtok(NULL, ":");
+    strcpy(channel, strtok(buf+CMD_SIZE, ":"));
+    //char *msg = strtok(NULL, ";");
     for (auto &it : channels) {
         if (strcmp(it.ID, channel) == 0) {
             for (auto &client : it.clients) {
                 if (client.socket != sock) {        // Don't send to him self
-                    if (send(client.socket, msg, sizeof(msg), 0) <= 0) {
+                    if (send(client.socket, temp+strlen(channel)+1, strlen(temp+strlen(channel)), 0) <= 0) {
                         perror("send");
                         std::cerr << "Failed to send message to client [" << client.nick << "]" << "\n";
                     }
