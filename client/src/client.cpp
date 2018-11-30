@@ -13,7 +13,7 @@
 const char divider[] = ":";
 int soc;
 char username[9]; //max. length is 9
-char channelname[12]; //max. length is 12
+char channelname[12] = {0}; //max. length is 12
 
 void Client::start_client() {
     while(true) {
@@ -25,6 +25,17 @@ void Client::start_client() {
             continue;
         }
         input[strcspn(input, "\n")] = 0; //delete \n from fgets
+        int accepted = 1;
+        for (int i = 0; i < strlen(input); i++) {
+            if (!(input[i] >= 'a' && input[i] <= 'z' || input[i] >= 'A' && input[i] <= 'Z' || input[i] >= '0' && input[i] <= '9')) {
+                accepted = 0;
+                break;
+            }
+        }
+        if (accepted == 0) {
+            printf("[WARNING] wrong letter, use A-Z or 0-9\n");
+            continue;
+        }
         strncpy(username, input, 9);
         char handshake[12] = {0};
         pack_cmd(IC_CLIENT, handshake);
@@ -51,7 +62,7 @@ void Client::handle_input() {
         printf("[%s][@%s]: ", username, channelname);
         char input[MAX_INPUT_LENGTH];
         if (fgets(input, MAX_INPUT_LENGTH, stdin) != NULL) {
-            printf("INPUT: %s", input);
+            //printf("INPUT: %s", input);
             input[strcspn(input, "\n")] = 0;
             //checks if command was used
             if (input[0] == '/') {
@@ -79,11 +90,19 @@ void Client::handle_command(char input[]) {
         send_command(QUIT);
         exit(EXIT_SUCCESS);
     } else if (strncmp(LEAVE_CMD, input, strlen(LEAVE_CMD)) == 0) {
+        if (strlen(channelname) < 1) {
+            printf("[ERROR] not member in a channel\n");
+            return;
+        }
         send_command(LEAVE);
         memset(channelname, 0, sizeof(channelname));
     } else if (strncmp(HELP_CMD, input, strlen(HELP_CMD)) == 0) {
         list_commands();
     } else if (strncmp(JOIN_CMD, input, strlen(JOIN_CMD)) == 0) {
+        //check if user is not in a channel
+        if(strlen(channelname) > 0) {
+            return;
+        }
         pack_cmd(JOIN, temp);
         strcpy(temp + CMD_SIZE, input + strlen(JOIN_CMD));
         send_message(temp);
@@ -92,9 +111,16 @@ void Client::handle_command(char input[]) {
     } else if (strncmp(NICK_CMD, input, strlen(NICK_CMD)) == 0) {
         //check if new username got the right size
         if(strlen(input) - strlen(NICK_CMD) >= 9) {
+            printf("[WARNING] username too long/short, please try again [1-9] letters\n");
             return;
         }
         //send [NICK][username] to server
+        for (int i = strlen(NICK_CMD); i < strlen(input); i++) {
+            if (!(input[i] >= 'a' && input[i] <= 'z' || input[i] >= 'A' && input[i] <= 'Z' || input[i] >= '0' && input[i] <= '9')) {
+                printf("[WARNING] wrong letter, use A-Z or 0-9\n");
+                return;
+            }
+        }
         pack_cmd(NICK, temp);
         strcpy(temp + CMD_SIZE, input + strlen(NICK_CMD));
         send_message(temp);
@@ -103,6 +129,9 @@ void Client::handle_command(char input[]) {
         if (recv(soc, buf, sizeof(buf), 0) != -1) {
             if (*((short*)buf) == VALID_CLIENT_NAME) {
                 strncpy(username, temp+CMD_SIZE, sizeof(username));
+            } else {
+                printf("username already in use\n");
+                return;
             }
         } else {
             perror("Could not change username, please try again");
@@ -110,6 +139,7 @@ void Client::handle_command(char input[]) {
         //printf("[%d%d%s]", temp[0], temp[1], temp + CMD_SIZE);
     } else if (strncmp(LIST_CMD, input, strlen(LIST_CMD)) == 0) {
         send_command(LIST);
+        printf("\n known channels:\n");
     } else if (strncmp(GTOPIC_CMD, input, strlen(GTOPIC_CMD)) == 0) {
         //send gettopic channel
         pack_cmd(GETTOPIC, temp);
@@ -211,4 +241,3 @@ void Client::pack_cmd(unsigned int cmd, char* buf) {
     buf[0] = ptr[0];
     buf[1] = ptr[1];
 }
-
