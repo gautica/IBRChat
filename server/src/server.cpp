@@ -102,15 +102,15 @@ void Server::add_new_client(char* msg)
 {
     s2c_t conn;
     strcpy(conn.conn, msg+CMD_SIZE);
+    std::cout << "add client: " << msg+CMD_SIZE << "\n";
     s2c_connections.push_back(conn);
 }
 
 void Server::remove_client(char* buf)
 {
-    char conn[strlen(buf)] = {0};
-    strcpy(conn, buf+CMD_SIZE);
     for (unsigned int i = 0; i < s2c_connections.size(); i++) {
-        if(strcmp(conn, s2c_connections.at(i).conn) == 0) {
+        if(strcmp(buf+CMD_SIZE, s2c_connections.at(i).conn) == 0) {
+            std::cout << "remove client: " << buf+CMD_SIZE << "\n";
             s2c_connections.erase(s2c_connections.begin()+i);
             return;
         }
@@ -121,7 +121,7 @@ void Server::leave_channel(char* buf)
 {
     for (unsigned int i = 0; i < ch2c_connections.size(); i++) {
         if (strcmp(buf+CMD_SIZE, ch2c_connections.at(i).conn) == 0) {
-            std::cout << "remove: " << buf+CMD_SIZE << "\n";
+            std::cout << "leave remove: " << buf+CMD_SIZE << "\n";
             ch2c_connections.erase(ch2c_connections.begin()+i);
             break;
         }
@@ -132,6 +132,7 @@ void Server::join_channel(char* buf)
 {
     ch2c_t conn;
     strcpy(conn.conn, buf+CMD_SIZE);
+    std::cout << "join add: " << conn.conn << "\n";
     ch2c_connections.push_back(conn);
 }
 
@@ -152,13 +153,6 @@ void Server::add_new_server(char* msg)
         s2s_connections.push_back(conn);
         token = strtok(NULL, ";");
     }
-}
-
-void Server::add_new_ch2c(char* msg)
-{
-    ch2c_t conn;
-    strcpy(conn.conn, msg+CMD_SIZE);
-    ch2c_connections.push_back(conn);
 }
 
 void Server::set_channel_topic(char* msg)
@@ -236,7 +230,7 @@ void Server::connect_server()
             //std::cout << "Failed to recieve update Info from server\n";
         } else {
             //handle_recvMsg(server_fd, buf);
-            std::cout << "buf: " << buf+CMD_SIZE << std::endl;
+            std::cout << "buf: " << buf+CMD_SIZE << ";" << std::endl;
             handle_server_update(server_fd, buf);
 
             memset(buf, 0, sizeof (buf));    // clear buffer
@@ -264,8 +258,11 @@ void Server::update_info(int &socket, int type, char* msg)
     }
     // Send info to parent server
     if (server_fd != 0 && server_fd != socket) {
+        std::cout << "send info to other servers: " << msg << "\n";
         send_data(server_fd, sendBuf);
     }
+
+    sleep(1);
 }
 
 void Server::pack_cmd(unsigned int cmd, char* buf)
@@ -300,10 +297,14 @@ void Server::unpack_update_info(int &sock, char* msg)
         case SC_CLIENT_NEW:
             add_new_client(msg);
             break;
+        case SC_CLIENT_REMOVE:
+            remove_client(msg);
+            break;
         case SC_SERVER_NEW:
             add_new_server(msg);
             break;
         case SC_CLIENT_LEAVE_CHANNEL:
+            std::cout << "leave channel\n";
             leave_channel(msg);
             break;
         case SC_CLIENT_JOIN_CHANNEL:
@@ -365,7 +366,6 @@ void Server::handle_server_update(int &sock,  char* buf)
 {
     char temp[strlen(buf+CMD_SIZE) + CMD_SIZE] = {0};
     if (*((short*) buf) == SC_CLIENT_NEW) {   // change server ID to this->ID
-        std::cout << "debug\n";
         s2c_t conn;
         strcpy(conn.conn, this->ID);
         strcat(conn.conn, "-");
@@ -375,7 +375,7 @@ void Server::handle_server_update(int &sock,  char* buf)
 
         update_info(sock, SC_CLIENT_NEW, conn.conn);
     } else {
-        update_info(sock, *(short*) buf, buf+CMD_SIZE);
+        update_info(sock, *((short*) buf), buf+CMD_SIZE);
     }
 
     unpack_update_info(sock, buf);
@@ -427,6 +427,16 @@ bool Server::is_nick_valid(char *nick)
         }
     }
     return true;
+}
+
+bool Server::is_channel_existed(char *channel)
+{
+    for (auto &conn : ch2c_connections) {
+        if (strncmp(channel, conn.conn, strlen(channel)) == 0) {
+            return true;
+        }
+    }
+    return false;
 }
 
 void Server::handle_client(int &sock, char *buf)
@@ -532,6 +542,10 @@ void Server::send_to_one(int &sock, char *buf)
         char* token = strtok(NULL, ":");
         if (send(fd, token, strlen(token), 0) <= 0) {   // send message direct to client
             std::cout << "Failed to send to client " << name << "\n";
+        } else {
+            if (*((short*) buf) != SC_PRIVMSG) {
+                handle_confirm(sock, VALID_CLIENT);
+            }
         }
     } else {
         char server[INET6_ADDRSTRLEN] = {0};
@@ -541,9 +555,11 @@ void Server::send_to_one(int &sock, char *buf)
                 fd = get_next_hop(server);
                 printf("fd: %d\n", fd);
                 if (fd > 0) {
-                    //handle_confirm(sock, VALID_CLIENT);
+                    if (*((short*) buf) != SC_PRIVMSG) {
+                        handle_confirm(sock, VALID_CLIENT);
+                    }
                     pack_cmd(SC_PRIVMSG, buf);
-                    send_data(sock, buf);
+                    send_data(fd, buf);
                 } else {
                     std::cerr << "Cannot find next hop\n";
                 }
@@ -561,16 +577,6 @@ void Server::send_to_one(int &sock, char *buf)
 void Server::send_to_all(int &sock, char *buf)
 {
     // Send to all other servers
-    /**
-    for (auto &it : servers) {
-        if (it.socket != sock) {
-            send_data(it.socket, buf);
-        }
-    }
-    if (server_fd != 0 && sock != server_fd) {
-        send_data(server_fd, buf);
-    }
-    */
     update_info(sock, SC_MSG, buf+CMD_SIZE);
 
     // Send to all clients who are under same channel
@@ -656,8 +662,11 @@ void Server::join(int &sock, char *buf)
         if (!valid_ch) {    // Create new channel under this server
             channel_t ch;
             strcpy(ch.ID, channel);
-            strcpy(ch.creator, clients.at(index).nick);        // Implementation is false for creator of channel !!!
-            std::cout << clients.at(index).nick << " create a new channel named: " << channel << "\n";
+            if (!is_channel_existed(channel)) {
+                strcpy(ch.creator, clients.at(index).nick);
+                std::cout << clients.at(index).nick << " create a new channel named: " << channel << "\n";
+            }
+            std::cout << clients.at(index).nick << "has joined channel: " << channel << "\n";
             ch.clients.push_back(clients.at(index));
             clients.erase(clients.begin() + index);
             channels.push_back(ch);
@@ -706,7 +715,6 @@ void Server::change_nick(int &sock, char* buf)
     strcat(conn.conn, name);
 
     update_info(sock, SC_CLIENT_NEW, conn.conn);
-
     for (auto &client : clients) {
         if (sock == client.socket) {
             conn.conn[0] = 0;
@@ -778,17 +786,17 @@ void Server::list_channels(int &sock)
 
 void Server::get_topic(int &sock, char *topic)
 {
-    
+    for (auto &ch_topic : ch_topics) {
+        if (strncmp(topic+CMD_SIZE, ch_topic.conn, strlen(topic+CMD_SIZE)) == 0) {
+            send_data(sock, ch_topic.conn);
+            return;
+        }
+    }
+
     for (auto &channel : channels) {
         if (strcmp(topic+CMD_SIZE, channel.ID) == 0) {
             send_data(sock, channel.topic);
             return;
-        }
-    }
-    for (auto &ch_topic : ch_topics) {
-        if (strncmp(topic+CMD_SIZE, ch_topic.conn, strlen(topic+CMD_SIZE)) == 0) {
-            send_data(sock, ch_topic.conn);
-            break;
         }
     }
 }

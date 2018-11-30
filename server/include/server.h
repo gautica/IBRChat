@@ -138,11 +138,11 @@ private:
     void add_new_client(char* buf);
     void remove_client(char* buf);
     void add_new_server(char* buf);
-    void add_new_ch2c(char* buf);
     void remove_ch2c(char* buf);
     void leave_channel(char* buf);
     void join_channel(char* buf);
     void set_channel_topic(char* buf);
+    bool is_channel_existed(char* channel);
 
     /**
      * @brief unpack_message: unpack update_info between servers
