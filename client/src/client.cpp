@@ -88,7 +88,7 @@ void Client::handle_command(char input[]) {
     if (strncmp(QUIT_CMD, input, strlen(QUIT_CMD)) == 0) {
         printf("see you soon\n");
         send_command(QUIT);
-        exit(EXIT_SUCCESS);
+        //exit(EXIT_SUCCESS);
     } else if (strncmp(LEAVE_CMD, input, strlen(LEAVE_CMD)) == 0) {
         if (strlen(channelname) < 1) {
             printf("[ERROR] not member in a channel\n");
