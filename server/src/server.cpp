@@ -261,7 +261,7 @@ void Server::update_info(int &socket, int type, char* msg)
         send_data(server_fd, sendBuf);
     }
 
-    sleep(1);
+    //sleep(1);
 }
 
 void Server::pack_cmd(unsigned int cmd, char* buf)
@@ -717,6 +717,8 @@ void Server::change_nick(int &sock, char* buf)
     strcat(conn.conn, name);
 
     update_info(sock, SC_CLIENT_NEW, conn.conn);
+    sleep(1);
+
     for (auto &client : clients) {
         if (sock == client.socket) {
             conn.conn[0] = 0;
@@ -738,12 +740,14 @@ void Server::change_nick(int &sock, char* buf)
                     strcat(conn_ch2c.conn, ":");
                     strcat(conn_ch2c.conn, channel.clients.at(i).nick);
                     update_info(sock, SC_CLIENT_LEAVE_CHANNEL, conn_ch2c.conn);
+                    sleep(1);
 
                     conn_ch2c.conn[0] = 0;
                     strcpy(conn_ch2c.conn, channel.ID);
                     strcat(conn_ch2c.conn, ":");
                     strcat(conn_ch2c.conn, name);
                     update_info(sock, SC_CLIENT_JOIN_CHANNEL, conn_ch2c.conn);
+                    sleep(1);
 
                     conn.conn[0] = 0;
                     strcpy(conn.conn, this->ID);
@@ -778,7 +782,7 @@ void Server::list_channels(int &sock)
     for (auto &ch2c : ch2c_connections) {
         char temp[CHANNEL_SIZE+1] = {0};
         strcpy(temp, strtok(ch2c.conn, ":"));
-        if (strstr(temp, ch_list) == NULL) {
+        if (strstr(ch_list, temp) == NULL) {
             strcat(ch_list, temp);
             strcat(ch_list, "\n");
         }
