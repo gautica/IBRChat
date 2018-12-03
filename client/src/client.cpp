@@ -141,7 +141,7 @@ void Client::handle_command(char input[]) {
         } else {
             perror("Could not change username, please try again");
         }
-        printf("[%d%d%s]", temp[0], temp[1], temp + CMD_SIZE);
+        //printf("[%d%d%s]", temp[0], temp[1], temp + CMD_SIZE);
     } else if (strncmp(LIST_CMD, input, strlen(LIST_CMD)) == 0) {
         send_command(LIST);
         printf("\n known channels:\n");

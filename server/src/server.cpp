@@ -850,7 +850,7 @@ void Server::quit(int &sock)
                 strcat(ch_conn.conn, ":");
                 strcat(ch_conn.conn, channel.clients.at(i).nick);
                 update_info(sock, SC_CLIENT_LEAVE_CHANNEL, ch_conn.conn);
-
+                sleep(1);
                 s2c_t conn;
                 strcpy(conn.conn, this->ID);
                 strcat(conn.conn, "-");
