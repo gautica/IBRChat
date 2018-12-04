@@ -172,7 +172,7 @@ void Server::set_channel_topic(char* msg)
 int Server::initalize_server(addrinfo_t &addr, const char* Port)
 {
     int sock;
-    getaddrinfo(IP, Port, &addr.hints, &addr.addr_info);
+    getaddrinfo("localhost", Port, &addr.hints, &addr.addr_info);
 
     // Creating socket file descriptor
     if ((sock = socket(addr.addr_info->ai_family, addr.addr_info->ai_socktype, addr.addr_info->ai_protocol)) == 0)
